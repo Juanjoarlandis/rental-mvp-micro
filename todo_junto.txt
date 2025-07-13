@@ -1,175 +1,568 @@
 --- rental-mvp-micro/estructura_directorios.json ---
 [
     {
-        "name": "frontend",
+        "name": "rental-mvp-micro",
         "dirs": [
             {
-                "name": "src",
+                "name": "services",
                 "dirs": [
                     {
-                        "name": "assets",
+                        "name": "auth",
                         "dirs": [
                             {
-                                "name": "payments",
-                                "dirs": [],
-                                "files": [
-                                    "paypal.svg",
-                                    "mastercard.svg",
-                                    "visa.svg"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "logo.png"
-                        ]
-                    },
-                    {
-                        "name": "hooks",
-                        "dirs": [],
-                        "files": [
-                            "useAuth.tsx",
-                            "useStripe.ts"
-                        ]
-                    },
-                    {
-                        "name": "styles",
-                        "dirs": [],
-                        "files": [
-                            "global.css"
-                        ]
-                    },
-                    {
-                        "name": "features",
-                        "dirs": [
-                            {
-                                "name": "auth",
-                                "dirs": [],
-                                "files": [
-                                    "register.ts",
-                                    "login.ts"
-                                ]
-                            },
-                            {
-                                "name": "categories",
-                                "dirs": [],
-                                "files": [
-                                    "useCategories.ts"
-                                ]
-                            },
-                            {
-                                "name": "items",
-                                "dirs": [],
-                                "files": [
-                                    "useItems.ts",
-                                    "AddItemModal.tsx",
-                                    "ItemList.tsx"
-                                ]
-                            },
-                            {
-                                "name": "rentals",
+                                "name": "migrations",
                                 "dirs": [
                                     {
-                                        "name": "payments",
+                                        "name": "versions",
                                         "dirs": [],
                                         "files": [
-                                            "createIntent.ts"
+                                            "20250712_init.py"
                                         ]
                                     }
                                 ],
                                 "files": [
-                                    "reserve.ts",
-                                    "RentalList.tsx",
-                                    "createRental.ts",
-                                    "useRentals.ts"
+                                    "script.py.mako",
+                                    "README",
+                                    "env.py"
+                                ]
+                            },
+                            {
+                                "name": "app",
+                                "dirs": [
+                                    {
+                                        "name": "models",
+                                        "dirs": [],
+                                        "files": [
+                                            "models.py",
+                                            "__init__.py",
+                                            "database.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "schemas",
+                                        "dirs": [],
+                                        "files": [
+                                            "token.py",
+                                            "__init__.py",
+                                            "user.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "crud",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "user.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "core",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "config.py",
+                                            "security.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "api",
+                                        "dirs": [],
+                                        "files": [
+                                            "auth.py",
+                                            "__init__.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "main.py",
+                                    "__init__.py",
+                                    "deps.py"
                                 ]
                             }
                         ],
-                        "files": []
-                    },
-                    {
-                        "name": "pages",
-                        "dirs": [],
                         "files": [
-                            "Register.tsx",
-                            "Login.tsx",
-                            "Dashboard.tsx",
-                            "Home.tsx"
+                            "requirements.txt",
+                            ".env",
+                            "Dockerfile",
+                            "alembic.ini"
                         ]
                     },
                     {
-                        "name": "components",
+                        "name": "frontend",
                         "dirs": [
                             {
-                                "name": "ui",
-                                "dirs": [],
+                                "name": "src",
+                                "dirs": [
+                                    {
+                                        "name": "assets",
+                                        "dirs": [
+                                            {
+                                                "name": "payments",
+                                                "dirs": [],
+                                                "files": [
+                                                    "paypal.svg",
+                                                    "mastercard.svg",
+                                                    "visa.svg"
+                                                ]
+                                            }
+                                        ],
+                                        "files": [
+                                            "logo.png"
+                                        ]
+                                    },
+                                    {
+                                        "name": "hooks",
+                                        "dirs": [],
+                                        "files": [
+                                            "useAuth.tsx",
+                                            "useStripe.ts"
+                                        ]
+                                    },
+                                    {
+                                        "name": "styles",
+                                        "dirs": [],
+                                        "files": [
+                                            "global.css"
+                                        ]
+                                    },
+                                    {
+                                        "name": "features",
+                                        "dirs": [
+                                            {
+                                                "name": "auth",
+                                                "dirs": [],
+                                                "files": [
+                                                    "register.ts",
+                                                    "login.ts"
+                                                ]
+                                            },
+                                            {
+                                                "name": "categories",
+                                                "dirs": [],
+                                                "files": [
+                                                    "useCategories.ts"
+                                                ]
+                                            },
+                                            {
+                                                "name": "items",
+                                                "dirs": [],
+                                                "files": [
+                                                    "useItems.ts",
+                                                    "AddItemModal.tsx",
+                                                    "ItemList.tsx"
+                                                ]
+                                            },
+                                            {
+                                                "name": "rentals",
+                                                "dirs": [
+                                                    {
+                                                        "name": "payments",
+                                                        "dirs": [],
+                                                        "files": [
+                                                            "createIntent.ts"
+                                                        ]
+                                                    }
+                                                ],
+                                                "files": [
+                                                    "reserve.ts",
+                                                    "RentalList.tsx",
+                                                    "createRental.ts",
+                                                    "useRentals.ts"
+                                                ]
+                                            }
+                                        ],
+                                        "files": []
+                                    },
+                                    {
+                                        "name": "pages",
+                                        "dirs": [],
+                                        "files": [
+                                            "Register.tsx",
+                                            "Login.tsx",
+                                            "Dashboard.tsx",
+                                            "Home.tsx"
+                                        ]
+                                    },
+                                    {
+                                        "name": "components",
+                                        "dirs": [
+                                            {
+                                                "name": "ui",
+                                                "dirs": [],
+                                                "files": [
+                                                    "PaymentModal.tsx",
+                                                    "SkeletonCard.tsx",
+                                                    "LazyImage.tsx",
+                                                    "ItemCard.tsx",
+                                                    "SearchBar.tsx",
+                                                    "ItemDetailModal.tsx",
+                                                    "SocialButton.tsx",
+                                                    "QuickViewModal.tsx"
+                                                ]
+                                            },
+                                            {
+                                                "name": "shared",
+                                                "dirs": [],
+                                                "files": [
+                                                    "Section.tsx",
+                                                    "Container.tsx"
+                                                ]
+                                            },
+                                            {
+                                                "name": "layout",
+                                                "dirs": [],
+                                                "files": [
+                                                    "Footer.tsx",
+                                                    "Header.tsx"
+                                                ]
+                                            },
+                                            {
+                                                "name": "Home",
+                                                "dirs": [],
+                                                "files": [
+                                                    "FAQ.tsx",
+                                                    "Stats.tsx",
+                                                    "LogoCloud.tsx",
+                                                    "Testimonials.tsx"
+                                                ]
+                                            },
+                                            {
+                                                "name": "filters",
+                                                "dirs": [],
+                                                "files": [
+                                                    "FiltersSidebar.tsx"
+                                                ]
+                                            }
+                                        ],
+                                        "files": []
+                                    }
+                                ],
                                 "files": [
-                                    "PaymentModal.tsx",
-                                    "SkeletonCard.tsx",
-                                    "LazyImage.tsx",
-                                    "ItemCard.tsx",
-                                    "SearchBar.tsx",
-                                    "ItemDetailModal.tsx",
-                                    "SocialButton.tsx",
-                                    "QuickViewModal.tsx"
-                                ]
-                            },
-                            {
-                                "name": "shared",
-                                "dirs": [],
-                                "files": [
-                                    "Section.tsx",
-                                    "Container.tsx"
-                                ]
-                            },
-                            {
-                                "name": "layout",
-                                "dirs": [],
-                                "files": [
-                                    "Footer.tsx",
-                                    "Header.tsx"
-                                ]
-                            },
-                            {
-                                "name": "Home",
-                                "dirs": [],
-                                "files": [
-                                    "FAQ.tsx",
-                                    "Stats.tsx",
-                                    "LogoCloud.tsx",
-                                    "Testimonials.tsx"
-                                ]
-                            },
-                            {
-                                "name": "filters",
-                                "dirs": [],
-                                "files": [
-                                    "FiltersSidebar.tsx"
+                                    "App.tsx",
+                                    "api.ts",
+                                    "ErrorBoundary.tsx",
+                                    "main.tsx",
+                                    "utils.ts",
+                                    "Protected.tsx"
                                 ]
                             }
                         ],
-                        "files": []
+                        "files": [
+                            "index.html",
+                            "package.json",
+                            "vite.config.ts",
+                            ".env",
+                            "Dockerfile",
+                            "nginx.conf",
+                            "tsconfig.json",
+                            "postcss.config.js",
+                            "tailwind.config.js"
+                        ]
+                    },
+                    {
+                        "name": "rentals",
+                        "dirs": [
+                            {
+                                "name": "migrations",
+                                "dirs": [
+                                    {
+                                        "name": "versions",
+                                        "dirs": [],
+                                        "files": [
+                                            "20250714_0001_initial.py",
+                                            ".gitkeep"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "script.py.mako",
+                                    "README",
+                                    "env.py"
+                                ]
+                            },
+                            {
+                                "name": "app",
+                                "dirs": [
+                                    {
+                                        "name": "models",
+                                        "dirs": [],
+                                        "files": [
+                                            "models.py",
+                                            "__init__.py",
+                                            "database.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "schemas",
+                                        "dirs": [],
+                                        "files": [
+                                            "rental.py",
+                                            "__init__.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "crud",
+                                        "dirs": [],
+                                        "files": [
+                                            "rental.py",
+                                            "__init__.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "core",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "config.py",
+                                            "security.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "api",
+                                        "dirs": [],
+                                        "files": [
+                                            "rentals.py",
+                                            "__init__.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "main.py",
+                                    "__init__.py",
+                                    "deps.py"
+                                ]
+                            }
+                        ],
+                        "files": [
+                            "requirements.txt",
+                            ".env",
+                            "Dockerfile",
+                            "alembic.ini",
+                            "test_rentals.sh"
+                        ]
+                    },
+                    {
+                        "name": "upload",
+                        "dirs": [
+                            {
+                                "name": "uploads",
+                                "dirs": [],
+                                "files": [
+                                    "logo.png"
+                                ]
+                            },
+                            {
+                                "name": "app",
+                                "dirs": [
+                                    {
+                                        "name": "core",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "config.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "api",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "upload.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "main.py",
+                                    "__init__.py",
+                                    "deps.py"
+                                ]
+                            }
+                        ],
+                        "files": [
+                            "requirements.txt",
+                            ".env",
+                            "test_upload.sh",
+                            "Dockerfile"
+                        ]
+                    },
+                    {
+                        "name": "payments",
+                        "dirs": [
+                            {
+                                "name": "migrations",
+                                "dirs": [
+                                    {
+                                        "name": "versions",
+                                        "dirs": [],
+                                        "files": []
+                                    }
+                                ],
+                                "files": [
+                                    "script.py.mako",
+                                    "env.py"
+                                ]
+                            },
+                            {
+                                "name": "app",
+                                "dirs": [
+                                    {
+                                        "name": "models",
+                                        "dirs": [],
+                                        "files": [
+                                            "payment.py",
+                                            "__init__.py",
+                                            "database.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "schemas",
+                                        "dirs": [],
+                                        "files": [
+                                            "payment.py",
+                                            "__init__.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "crud",
+                                        "dirs": [],
+                                        "files": [
+                                            "payment.py",
+                                            "__init__.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "workers",
+                                        "dirs": [],
+                                        "files": [
+                                            "settlement.py",
+                                            "__init__.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "core",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "config.py",
+                                            "stripe.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "api",
+                                        "dirs": [],
+                                        "files": [
+                                            "payments.py",
+                                            "webhooks.py",
+                                            "__init__.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "main.py",
+                                    "__init__.py",
+                                    "deps.py"
+                                ]
+                            }
+                        ],
+                        "files": [
+                            "requirements.txt",
+                            ".env",
+                            "Dockerfile",
+                            "alembic.ini"
+                        ]
+                    },
+                    {
+                        "name": "catalog",
+                        "dirs": [
+                            {
+                                "name": "migrations",
+                                "dirs": [
+                                    {
+                                        "name": "versions",
+                                        "dirs": [],
+                                        "files": [
+                                            "20250713_0001_initial.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "script.py.mako",
+                                    "README",
+                                    "env.py"
+                                ]
+                            },
+                            {
+                                "name": "app",
+                                "dirs": [
+                                    {
+                                        "name": "models",
+                                        "dirs": [],
+                                        "files": [
+                                            "models.py",
+                                            "__init__.py",
+                                            "database.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "schemas",
+                                        "dirs": [],
+                                        "files": [
+                                            "category.py",
+                                            "__init__.py",
+                                            "item.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "crud",
+                                        "dirs": [],
+                                        "files": [
+                                            "category.py",
+                                            "__init__.py",
+                                            "item.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "core",
+                                        "dirs": [],
+                                        "files": [
+                                            "__init__.py",
+                                            "config.py"
+                                        ]
+                                    },
+                                    {
+                                        "name": "api",
+                                        "dirs": [],
+                                        "files": [
+                                            "items.py",
+                                            "categories.py",
+                                            "__init__.py",
+                                            "upload.py"
+                                        ]
+                                    }
+                                ],
+                                "files": [
+                                    "main.py",
+                                    "__init__.py",
+                                    "deps.py"
+                                ]
+                            }
+                        ],
+                        "files": [
+                            "requirements.txt",
+                            ".env",
+                            "Dockerfile",
+                            "test_endpoints.sh",
+                            "alembic.ini"
+                        ]
                     }
                 ],
-                "files": [
-                    "App.tsx",
-                    "api.ts",
-                    "ErrorBoundary.tsx",
-                    "main.tsx",
-                    "utils.ts",
-                    "Protected.tsx"
-                ]
+                "files": []
             }
         ],
         "files": [
-            "index.html",
-            "package.json",
-            "vite.config.ts",
-            ".env",
-            "Dockerfile",
-            "nginx.conf",
-            "tsconfig.json",
-            "postcss.config.js",
-            "tailwind.config.js"
+            "estructura_directorios.json",
+            "docker-compose.prod.yml",
+            ".env"
         ]
     }
 ]
@@ -2260,30 +2653,61 @@ export async function reserve(item_id: number) {
 
 
 --- rental-mvp-micro/services/frontend/src/features/rentals/RentalList.tsx ---
+// src/features/rentals/RentalList.tsx
 import { useAuth } from "../../hooks/useAuth";
-import { useRentals } from "./useRentals";
+import { useRentals, RentalStatus } from "./useRentals";
+import clsx from "clsx";
 
+/* ------------------------------------------------------------------ */
+/*                         Helper visual                              */
+/* ------------------------------------------------------------------ */
+function statusLabel(s: RentalStatus) {
+  switch (s) {
+    case "pending":
+      return ["Pendiente", "badge badge--danger"];
+    case "confirmed":
+      return ["Confirmado", "badge badge--ok"];
+    case "returned":
+      return ["Devuelto", "badge"];
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*                           Componente                               */
+/* ------------------------------------------------------------------ */
 export default function RentalList() {
   const { token } = useAuth();
-  const { data: rentals, loading } = useRentals(token);   // ← sin cambios extra
+  const {
+    data: rentals,
+    loading,
+  } = useRentals(token); // ← hook actualizado
 
-  if (!token)   return <p className="text-gray-500">Debes iniciar sesión para ver tus alquileres.</p>;
-  if (loading)  return <p className="text-gray-500">Cargando…</p>;
-  if (!rentals.length) return <p className="text-gray-500">No tienes alquileres activos.</p>;
+  if (!token)
+    return (
+      <p className="text-gray-500">
+        Debes iniciar sesión para ver tus alquileres.
+      </p>
+    );
+
+  if (loading) return <p className="text-gray-500">Cargando…</p>;
+
+  if (!rentals.length)
+    return <p className="text-gray-500">No tienes alquileres activos.</p>;
 
   return (
     <div className="space-y-2">
-      {rentals.map(r => (
-        <div
-          key={r.id}
-          className="flex items-center justify-between rounded-md bg-white p-3 shadow"
-        >
-          <span className="font-medium">{r.item.name}</span>
-          <span className={r.returned ? "badge--ok" : "badge badge--danger"}>
-            {r.returned ? "Devuelto" : "Pendiente"}
-          </span>
-        </div>
-      ))}
+      {rentals.map(r => {
+        const [txt, cls] = statusLabel(r.status);
+        return (
+          <div
+            key={r.id}
+            className="flex items-center justify-between rounded-md bg-white p-3 shadow"
+          >
+            <span className="font-medium">{r.item.name}</span>
+            <span className={cls}>{txt}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2303,9 +2727,16 @@ export async function createRental(item_id: number,
 
 
 --- rental-mvp-micro/services/frontend/src/features/rentals/useRentals.ts ---
+// src/features/rentals/useRentals.ts
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api";
 import { Item } from "../items/useItems";
+
+/* ------------------------------------------------------------------ */
+/*                              Types                                 */
+/* ------------------------------------------------------------------ */
+
+export type RentalStatus = "pending" | "confirmed" | "returned";
 
 export type Rental = {
   id: number;
@@ -2313,25 +2744,29 @@ export type Rental = {
   start_at: string;
   end_at: string;
   deposit: number;
-  returned: boolean;
+  status: RentalStatus;       // ← reemplaza a «returned»
 };
 
+/* ------------------------------------------------------------------ */
+/*                               Hook                                 */
+/* ------------------------------------------------------------------ */
+
 /**
- * Devuelve la lista de alquileres del usuario.  
- * Solo dispara la petición cuando `token` es *truthy*.
+ * Devuelve los alquileres del usuario autenticado.
+ * La petición solo se dispara cuando `token` es truthy.
  */
 export function useRentals(token: string | null) {
-  const enabled = Boolean(token);          // ← normalizamos
+  const enabled = Boolean(token);
 
-  const { data, isLoading } = useQuery<Rental[]>({
+  const { data, isLoading, refetch } = useQuery<Rental[]>({
     queryKey: ["rentals"],
     queryFn: () => api.get<Rental[]>("/rentals/me").then(r => r.data),
-    enabled,                               // ✓ ahora siempre boolean
+    enabled,
     staleTime: 60_000,
     retry: false
   });
 
-  return { data: data ?? [], loading: isLoading };
+  return { data: data ?? [], loading: isLoading, refetch };
 }
 
 
@@ -2785,6 +3220,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 /* ⚠️  usa tu clave pública de Stripe (env var VITE_STRIPE_PK) */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
@@ -2866,6 +3302,7 @@ function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
+  const qc = useQueryClient();  // ← invalidate cache
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2874,10 +3311,6 @@ function CheckoutForm({
     setProcessing(true);
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        /* 👇 opción de redirección si quisieras */
-        // return_url: `${window.location.origin}/dashboard`,
-      },
       redirect: "if_required",
     });
 
@@ -2886,7 +3319,9 @@ function CheckoutForm({
     if (error) {
       toast.error(error.message ?? "No se pudo procesar el pago.");
     } else {
-      onSuccess(); // ← notifica al padre (QuickViewModal)
+      /* 🔄 refrescar lista de alquileres */
+      qc.invalidateQueries({ queryKey: ["rentals"] });
+      onSuccess(); // ← callback del padre
     }
   };
 
@@ -4553,31 +4988,49 @@ def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
 
 
 --- rental-mvp-micro/services/rentals/app/models/models.py ---
+# services/rentals/app/models/models.py
+from __future__ import annotations
+
+import datetime
 import enum
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Enum
-# …
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    Integer,
+    String,
+)
+
+from app.models.database import Base
+
 
 class RentalStatus(str, enum.Enum):
-    pending   = "pending"     # reserva creada, a la espera de pagar la fianza
-    confirmed = "confirmed"   # fianza retenida correctamente (tu “pagado”)
-    returned  = "returned"    # ítem devuelto, cargo capturado
+    pending = "pending"      # reserva creada, a la espera de pagar
+    confirmed = "confirmed"  # fianza retenida
+    returned = "returned"    # ítem devuelto y cargo capturado
+
 
 class Rental(Base):
     __tablename__ = "rentals"
 
-    id              = Column(Integer, primary_key=True)
-    item_id         = Column(Integer, nullable=False, index=True)
-    renter_username = Column(String,  nullable=False, index=True)
-    start_at        = Column(DateTime, default=datetime.datetime.utcnow)
-    end_at          = Column(DateTime)
-    deposit         = Column(Float, nullable=False)
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, nullable=False, index=True)
+    renter_username = Column(String, nullable=False, index=True)
 
-    # --- nuevo ---
-    status          = Column(
+    start_at = Column(DateTime, default=datetime.datetime.utcnow)
+    end_at = Column(DateTime)
+
+    deposit = Column(Float, nullable=False)
+
+    # --- nuevos campos ---
+    status = Column(
         Enum(RentalStatus, name="rental_status"),
         default=RentalStatus.pending,
         nullable=False,
     )
+    returned = Column(Boolean, default=False)  # compatibilidad legado
 
 
 --- rental-mvp-micro/services/rentals/app/models/__init__.py ---

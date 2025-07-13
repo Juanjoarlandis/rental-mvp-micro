@@ -12,6 +12,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 /* ⚠️  usa tu clave pública de Stripe (env var VITE_STRIPE_PK) */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
@@ -93,6 +94,7 @@ function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
+  const qc = useQueryClient();  // ← invalidate cache
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,10 +103,6 @@ function CheckoutForm({
     setProcessing(true);
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        /* 👇 opción de redirección si quisieras */
-        // return_url: `${window.location.origin}/dashboard`,
-      },
       redirect: "if_required",
     });
 
@@ -113,7 +111,9 @@ function CheckoutForm({
     if (error) {
       toast.error(error.message ?? "No se pudo procesar el pago.");
     } else {
-      onSuccess(); // ← notifica al padre (QuickViewModal)
+      /* 🔄 refrescar lista de alquileres */
+      qc.invalidateQueries({ queryKey: ["rentals"] });
+      onSuccess(); // ← callback del padre
     }
   };
 
