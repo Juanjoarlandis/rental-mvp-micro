@@ -7,19 +7,19 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    Enum,
     Float,
     Integer,
     String,
 )
+from sqlalchemy.dialects import postgresql
 
 from app.models.database import Base
 
 
 class RentalStatus(str, enum.Enum):
-    pending = "pending"      # reserva creada, a la espera de pagar
-    confirmed = "confirmed"  # fianza retenida
-    returned = "returned"    # ítem devuelto y cargo capturado
+    pending   = "pending"
+    confirmed = "confirmed"
+    returned  = "returned"
 
 
 class Rental(Base):
@@ -30,14 +30,17 @@ class Rental(Base):
     renter_username = Column(String, nullable=False, index=True)
 
     start_at = Column(DateTime, default=datetime.datetime.utcnow)
-    end_at = Column(DateTime)
+    end_at   = Column(DateTime)
 
     deposit = Column(Float, nullable=False)
 
-    # --- nuevos campos ---
     status = Column(
-        Enum(RentalStatus, name="rental_status"),
+        postgresql.ENUM(
+            RentalStatus,
+            name="rental_status",
+            create_type=False          # ← usa el TYPE ya existente
+        ),
         default=RentalStatus.pending,
         nullable=False,
     )
-    returned = Column(Boolean, default=False)  # compatibilidad legado
+    returned = Column(Boolean, default=False)

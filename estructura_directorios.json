@@ -1,567 +1,86 @@
 [
     {
-        "name": "rental-mvp-micro",
+        "name": "catalog",
         "dirs": [
             {
-                "name": "services",
+                "name": "migrations",
                 "dirs": [
                     {
-                        "name": "auth",
-                        "dirs": [
-                            {
-                                "name": "migrations",
-                                "dirs": [
-                                    {
-                                        "name": "versions",
-                                        "dirs": [],
-                                        "files": [
-                                            "20250712_init.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "script.py.mako",
-                                    "README",
-                                    "env.py"
-                                ]
-                            },
-                            {
-                                "name": "app",
-                                "dirs": [
-                                    {
-                                        "name": "models",
-                                        "dirs": [],
-                                        "files": [
-                                            "models.py",
-                                            "__init__.py",
-                                            "database.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "schemas",
-                                        "dirs": [],
-                                        "files": [
-                                            "token.py",
-                                            "__init__.py",
-                                            "user.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "crud",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "user.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "core",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "config.py",
-                                            "security.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "api",
-                                        "dirs": [],
-                                        "files": [
-                                            "auth.py",
-                                            "__init__.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "main.py",
-                                    "__init__.py",
-                                    "deps.py"
-                                ]
-                            }
-                        ],
+                        "name": "versions",
+                        "dirs": [],
                         "files": [
-                            "requirements.txt",
-                            ".env",
-                            "Dockerfile",
-                            "alembic.ini"
-                        ]
-                    },
-                    {
-                        "name": "frontend",
-                        "dirs": [
-                            {
-                                "name": "src",
-                                "dirs": [
-                                    {
-                                        "name": "assets",
-                                        "dirs": [
-                                            {
-                                                "name": "payments",
-                                                "dirs": [],
-                                                "files": [
-                                                    "paypal.svg",
-                                                    "mastercard.svg",
-                                                    "visa.svg"
-                                                ]
-                                            }
-                                        ],
-                                        "files": [
-                                            "logo.png"
-                                        ]
-                                    },
-                                    {
-                                        "name": "hooks",
-                                        "dirs": [],
-                                        "files": [
-                                            "useAuth.tsx",
-                                            "useStripe.ts"
-                                        ]
-                                    },
-                                    {
-                                        "name": "styles",
-                                        "dirs": [],
-                                        "files": [
-                                            "global.css"
-                                        ]
-                                    },
-                                    {
-                                        "name": "features",
-                                        "dirs": [
-                                            {
-                                                "name": "auth",
-                                                "dirs": [],
-                                                "files": [
-                                                    "register.ts",
-                                                    "login.ts"
-                                                ]
-                                            },
-                                            {
-                                                "name": "categories",
-                                                "dirs": [],
-                                                "files": [
-                                                    "useCategories.ts"
-                                                ]
-                                            },
-                                            {
-                                                "name": "items",
-                                                "dirs": [],
-                                                "files": [
-                                                    "useItems.ts",
-                                                    "AddItemModal.tsx",
-                                                    "ItemList.tsx"
-                                                ]
-                                            },
-                                            {
-                                                "name": "rentals",
-                                                "dirs": [
-                                                    {
-                                                        "name": "payments",
-                                                        "dirs": [],
-                                                        "files": [
-                                                            "createIntent.ts"
-                                                        ]
-                                                    }
-                                                ],
-                                                "files": [
-                                                    "reserve.ts",
-                                                    "RentalList.tsx",
-                                                    "createRental.ts",
-                                                    "useRentals.ts"
-                                                ]
-                                            }
-                                        ],
-                                        "files": []
-                                    },
-                                    {
-                                        "name": "pages",
-                                        "dirs": [],
-                                        "files": [
-                                            "Register.tsx",
-                                            "Login.tsx",
-                                            "Dashboard.tsx",
-                                            "Home.tsx"
-                                        ]
-                                    },
-                                    {
-                                        "name": "components",
-                                        "dirs": [
-                                            {
-                                                "name": "ui",
-                                                "dirs": [],
-                                                "files": [
-                                                    "PaymentModal.tsx",
-                                                    "SkeletonCard.tsx",
-                                                    "LazyImage.tsx",
-                                                    "ItemCard.tsx",
-                                                    "SearchBar.tsx",
-                                                    "ItemDetailModal.tsx",
-                                                    "SocialButton.tsx",
-                                                    "QuickViewModal.tsx"
-                                                ]
-                                            },
-                                            {
-                                                "name": "shared",
-                                                "dirs": [],
-                                                "files": [
-                                                    "Section.tsx",
-                                                    "Container.tsx"
-                                                ]
-                                            },
-                                            {
-                                                "name": "layout",
-                                                "dirs": [],
-                                                "files": [
-                                                    "Footer.tsx",
-                                                    "Header.tsx"
-                                                ]
-                                            },
-                                            {
-                                                "name": "Home",
-                                                "dirs": [],
-                                                "files": [
-                                                    "FAQ.tsx",
-                                                    "Stats.tsx",
-                                                    "LogoCloud.tsx",
-                                                    "Testimonials.tsx"
-                                                ]
-                                            },
-                                            {
-                                                "name": "filters",
-                                                "dirs": [],
-                                                "files": [
-                                                    "FiltersSidebar.tsx"
-                                                ]
-                                            }
-                                        ],
-                                        "files": []
-                                    }
-                                ],
-                                "files": [
-                                    "App.tsx",
-                                    "api.ts",
-                                    "ErrorBoundary.tsx",
-                                    "main.tsx",
-                                    "utils.ts",
-                                    "Protected.tsx"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "index.html",
-                            "package.json",
-                            "vite.config.ts",
-                            ".env",
-                            "Dockerfile",
-                            "nginx.conf",
-                            "tsconfig.json",
-                            "postcss.config.js",
-                            "tailwind.config.js"
-                        ]
-                    },
-                    {
-                        "name": "rentals",
-                        "dirs": [
-                            {
-                                "name": "migrations",
-                                "dirs": [
-                                    {
-                                        "name": "versions",
-                                        "dirs": [],
-                                        "files": [
-                                            "20250714_0001_initial.py",
-                                            ".gitkeep"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "script.py.mako",
-                                    "README",
-                                    "env.py"
-                                ]
-                            },
-                            {
-                                "name": "app",
-                                "dirs": [
-                                    {
-                                        "name": "models",
-                                        "dirs": [],
-                                        "files": [
-                                            "models.py",
-                                            "__init__.py",
-                                            "database.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "schemas",
-                                        "dirs": [],
-                                        "files": [
-                                            "rental.py",
-                                            "__init__.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "crud",
-                                        "dirs": [],
-                                        "files": [
-                                            "rental.py",
-                                            "__init__.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "core",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "config.py",
-                                            "security.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "api",
-                                        "dirs": [],
-                                        "files": [
-                                            "rentals.py",
-                                            "__init__.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "main.py",
-                                    "__init__.py",
-                                    "deps.py"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "requirements.txt",
-                            ".env",
-                            "Dockerfile",
-                            "alembic.ini",
-                            "test_rentals.sh"
-                        ]
-                    },
-                    {
-                        "name": "upload",
-                        "dirs": [
-                            {
-                                "name": "uploads",
-                                "dirs": [],
-                                "files": [
-                                    "logo.png"
-                                ]
-                            },
-                            {
-                                "name": "app",
-                                "dirs": [
-                                    {
-                                        "name": "core",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "config.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "api",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "upload.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "main.py",
-                                    "__init__.py",
-                                    "deps.py"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "requirements.txt",
-                            ".env",
-                            "test_upload.sh",
-                            "Dockerfile"
-                        ]
-                    },
-                    {
-                        "name": "payments",
-                        "dirs": [
-                            {
-                                "name": "migrations",
-                                "dirs": [
-                                    {
-                                        "name": "versions",
-                                        "dirs": [],
-                                        "files": []
-                                    }
-                                ],
-                                "files": [
-                                    "script.py.mako",
-                                    "env.py"
-                                ]
-                            },
-                            {
-                                "name": "app",
-                                "dirs": [
-                                    {
-                                        "name": "models",
-                                        "dirs": [],
-                                        "files": [
-                                            "payment.py",
-                                            "__init__.py",
-                                            "database.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "schemas",
-                                        "dirs": [],
-                                        "files": [
-                                            "payment.py",
-                                            "__init__.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "crud",
-                                        "dirs": [],
-                                        "files": [
-                                            "payment.py",
-                                            "__init__.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "workers",
-                                        "dirs": [],
-                                        "files": [
-                                            "settlement.py",
-                                            "__init__.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "core",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "config.py",
-                                            "stripe.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "api",
-                                        "dirs": [],
-                                        "files": [
-                                            "payments.py",
-                                            "webhooks.py",
-                                            "__init__.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "main.py",
-                                    "__init__.py",
-                                    "deps.py"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "requirements.txt",
-                            ".env",
-                            "Dockerfile",
-                            "alembic.ini"
-                        ]
-                    },
-                    {
-                        "name": "catalog",
-                        "dirs": [
-                            {
-                                "name": "migrations",
-                                "dirs": [
-                                    {
-                                        "name": "versions",
-                                        "dirs": [],
-                                        "files": [
-                                            "20250713_0001_initial.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "script.py.mako",
-                                    "README",
-                                    "env.py"
-                                ]
-                            },
-                            {
-                                "name": "app",
-                                "dirs": [
-                                    {
-                                        "name": "models",
-                                        "dirs": [],
-                                        "files": [
-                                            "models.py",
-                                            "__init__.py",
-                                            "database.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "schemas",
-                                        "dirs": [],
-                                        "files": [
-                                            "category.py",
-                                            "__init__.py",
-                                            "item.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "crud",
-                                        "dirs": [],
-                                        "files": [
-                                            "category.py",
-                                            "__init__.py",
-                                            "item.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "core",
-                                        "dirs": [],
-                                        "files": [
-                                            "__init__.py",
-                                            "config.py"
-                                        ]
-                                    },
-                                    {
-                                        "name": "api",
-                                        "dirs": [],
-                                        "files": [
-                                            "items.py",
-                                            "categories.py",
-                                            "__init__.py",
-                                            "upload.py"
-                                        ]
-                                    }
-                                ],
-                                "files": [
-                                    "main.py",
-                                    "__init__.py",
-                                    "deps.py"
-                                ]
-                            }
-                        ],
-                        "files": [
-                            "requirements.txt",
-                            ".env",
-                            "Dockerfile",
-                            "test_endpoints.sh",
-                            "alembic.ini"
+                            "20250713_0001_initial.py"
                         ]
                     }
                 ],
-                "files": []
+                "files": [
+                    "script.py.mako",
+                    "README",
+                    "env.py"
+                ]
+            },
+            {
+                "name": "app",
+                "dirs": [
+                    {
+                        "name": "models",
+                        "dirs": [],
+                        "files": [
+                            "models.py",
+                            "__init__.py",
+                            "database.py"
+                        ]
+                    },
+                    {
+                        "name": "schemas",
+                        "dirs": [],
+                        "files": [
+                            "category.py",
+                            "__init__.py",
+                            "item.py"
+                        ]
+                    },
+                    {
+                        "name": "crud",
+                        "dirs": [],
+                        "files": [
+                            "category.py",
+                            "__init__.py",
+                            "item.py"
+                        ]
+                    },
+                    {
+                        "name": "core",
+                        "dirs": [],
+                        "files": [
+                            "__init__.py",
+                            "config.py"
+                        ]
+                    },
+                    {
+                        "name": "api",
+                        "dirs": [],
+                        "files": [
+                            "items.py",
+                            "categories.py",
+                            "__init__.py",
+                            "upload.py"
+                        ]
+                    }
+                ],
+                "files": [
+                    "main.py",
+                    "__init__.py",
+                    "deps.py"
+                ]
             }
         ],
         "files": [
-            "estructura_directorios.json",
-            "docker-compose.prod.yml",
-            ".env"
+            "requirements.txt",
+            ".env",
+            "Dockerfile",
+            "test_endpoints.sh",
+            "alembic.ini"
         ]
     }
 ]

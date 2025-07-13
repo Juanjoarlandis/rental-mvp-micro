@@ -2,8 +2,6 @@
 from fastapi import FastAPI
 
 from app.api import rentals
-from app.models.database import Base, engine
-import app.models.models                         #  noqa: F401
 
 app = FastAPI(
     title="rental-mvp – Rentals Service",
@@ -12,8 +10,13 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-@app.on_event("startup")
-def _init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+# La BD se gestiona exclusivamente con Alembic;
+# no ejecutamos create_all() para evitar conflictos.
+# (Si lo prefieres, elimina por completo este fichero on_event)
+#
+# from app.models.database import Base, engine
+# @app.on_event("startup")
+# def _init_db() -> None:
+#     Base.metadata.create_all(bind=engine)
 
 app.include_router(rentals.router, prefix="/api/rentals", tags=["rentals"])

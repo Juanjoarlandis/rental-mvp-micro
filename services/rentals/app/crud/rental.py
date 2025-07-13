@@ -7,7 +7,7 @@ from typing import List
 import httpx
 from sqlalchemy.orm import Session
 
-from app.models.models import Rental
+from app.models.models import Rental, RentalStatus          # ← enum importado
 from app.schemas.rental import RentalCreate
 from app.core.config import settings
 
@@ -15,8 +15,8 @@ from app.core.config import settings
 # ───────── helpers internos ───────────────────────────────────────────────
 async def _fetch_item(item_id: int) -> dict:
     """
-    Llama al micro-servicio **Catalog** para obtener el item
-    (levanta HTTPError si no existe / 404).
+    Llama al micro‑servicio **Catalog** para obtener el ítem.
+    Lanza HTTPError si no existe / 404.
     """
     url = f"{settings.CATALOG_API_BASE}/items/{item_id}"
     async with httpx.AsyncClient() as client:
@@ -27,7 +27,7 @@ async def _fetch_item(item_id: int) -> dict:
 
 def _calc_deposit(hours: float, price: float) -> float:
     """
-    Depósito = 120 % del coste estimado (redondeado a 2 decimales).
+    Depósito = 120 % del coste estimado (redondeo a 2 decimales).
     """
     raw = Decimal(hours * price * 1.2)
     return float(raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
@@ -42,7 +42,7 @@ async def create_rental(
     item = await _fetch_item(rent_in.item_id)            # -- HTTP → Catalog
 
     if not item["available"]:
-        raise ValueError("Item no disponible")
+        raise ValueError("Ítem no disponible")
 
     hours = (rent_in.end_at - rent_in.start_at).total_seconds() / 3600
     deposit = _calc_deposit(hours, item["price_per_h"])
@@ -50,7 +50,8 @@ async def create_rental(
     db_rental = Rental(
         renter_username=renter_username,
         deposit=deposit,
-        returned=False,
+        status=RentalStatus.pending,                     # ← nuevo
+        returned=False,                                  # compatibilidad
         **rent_in.model_dump(),
     )
     db.add(db_rental)
@@ -69,6 +70,7 @@ def get_rentals_by_user(db: Session, username: str) -> List[Rental]:
 
 def mark_returned(db: Session, rental: Rental) -> Rental:
     rental.returned = True
+    rental.status = RentalStatus.returned                # ← sincroniza estado
     db.commit()
     db.refresh(rental)
     return rental
