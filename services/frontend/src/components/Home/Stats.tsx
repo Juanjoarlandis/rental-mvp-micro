@@ -1,3 +1,4 @@
+/* src/components/Home/Stats.tsx */
 import { useEffect, useRef, useState } from 'react';
 import Container from '../shared/Container';
 
@@ -8,7 +9,6 @@ const DATA = [
 ];
 
 export default function Stats() {
-  /* animate on scroll into view */
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -29,8 +29,11 @@ export default function Stats() {
         <div className="grid gap-8 sm:grid-cols-3">
           {DATA.map(({ label, value }) => (
             <div key={label} className="text-center">
-              <p className="text-4xl font-extrabold text-brand">
-                {visible ? value.toLocaleString() : '0'}
+              <p
+                className="text-4xl font-extrabold text-brand"
+                style={visible ? { '--target': value, animation: 'count 2s ease-out forwards' } as React.CSSProperties : {}}
+              >
+                {visible ? '' : '0'}
               </p>
               <p className="mt-2 text-sm font-medium text-gray-600">{label}</p>
             </div>

@@ -12,8 +12,8 @@
 /* ---------- COMPONENTS ---------- */
 @layer components {
   /* Botones */
-  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-hover disabled:opacity-60; }
-  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/5; }
+  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md disabled:opacity-60 active:scale-95; }  /* +hover shadow, active scale */
+  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm active:scale-95; }
 
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
@@ -21,7 +21,7 @@
   .badge--danger { @apply badge bg-red-100 text-red-800; }
 
   /* Campos select genérico */
-  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand; }
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200; }
 
   /* Toast */
   .toast-success { @apply bg-green-600 text-white; }
@@ -40,4 +40,13 @@
 
   /* Oculta scrollbar (usarlo con cuidado) */
   .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* Animaciones on-scroll */
+  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+  /* Count-up para stats */
+  .count-up { counter-reset: num var(--num); }
+  .count-up::after { content: counter(num); }
+  @keyframes count { from { --num: 0; } to { --num: var(--target); } }
 }

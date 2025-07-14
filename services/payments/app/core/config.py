@@ -14,23 +14,27 @@ class Settings(BaseSettings):
     DOMAIN: str = "http://localhost:8005"
 
     # ───── CORS ───────────────────────────────────────────────────────────
-    ALLOWED_ORIGINS: str = ""                  # lista separada por comas
+    ALLOWED_ORIGINS: str = ""  # Cambiado a str, comma-separated
 
     # ───── BD (opcional) ─────────────────────────────────────────────────
     DATABASE_URL: str | None = None
 
-    # lee .env y omite claves extra
+    # FIX: Añadido para Pydantic v2 compat
     model_config = {"env_file": ".env", "extra": "ignore"}
 
-    # ──────────────────────────────────────────────────────────────────────
-    #  Acceso unificado a la clave secreta
-    # ──────────────────────────────────────────────────────────────────────
+    # ───── Property para splitear ─────────────────────────────────────────
+    @cached_property
+    def allowed_origins(self) -> list[str]:
+        try:
+            if not self.ALLOWED_ORIGINS:
+                return []
+            return [o.strip() for o in self.ALLOWED_ORIGINS.split(',') if o.strip()]
+        except Exception as e:
+            raise ValueError(f"Error parsing ALLOWED_ORIGINS: {e}") from e
+
+    # ───── Acceso unificado a secret_key ──────────────────────────────────
     @cached_property
     def secret_key(self) -> str:
-        """
-        Devuelve la clave secreta de Stripe sin importar el nombre de la
-        variable.  STRIPE_SECRET_KEY tiene prioridad sobre STRIPE_API_KEY.
-        """
         key = self.STRIPE_SECRET_KEY or self.STRIPE_API_KEY
         if not key:
             raise RuntimeError(

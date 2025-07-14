@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from app.models.payment import Payment
-from app.schemas.payment import PaymentCreate
+from models.payment import Payment
+from schemas.payment import PaymentCreate
 
 def create(db: Session, payment_in: PaymentCreate, stripe_pi: str) -> Payment:
     p = Payment(**payment_in.model_dump(), stripe_pi=stripe_pi)

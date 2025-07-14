@@ -51,6 +51,19 @@ async def return_item(
     return await _with_item(rental)
 
 
+# ────────────── ### NEW: Disponibilidad de un ítem ─────────────────────────
+@router.get("/item/{item_id}/availability", response_model=List[schemas.DateRange])
+async def get_item_availability(
+    item_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Devuelve rangos ocupados para un ítem (para calendario frontend).
+    Solo rangos activos (no returned).
+    """
+    return crud.get_occupied_ranges(db, item_id)
+
+
 # ────────────── helper común ──────────────────────────────────────────────
 import httpx
 from app.core.config import settings

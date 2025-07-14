@@ -6,12 +6,12 @@
  */
 import { api } from "../../api";
 
-export async function reserve(item_id: number) {
-  // demo: 1 h desde ahora
-  const start_at = new Date().toISOString();
-  const end_at   = new Date(Date.now() + 3_600_000).toISOString();
+// ### UPDATED: Acepta fechas reales
+export async function reserve(item_id: number, start: Date, end: Date) {
+  const start_at = start.toISOString();
+  const end_at = end.toISOString();
 
-  // 1) crear alquiler
+  // 1) crear alquiler con fechas
   const { data: rental } = await api.post("/rentals/", {
     item_id,
     start_at,

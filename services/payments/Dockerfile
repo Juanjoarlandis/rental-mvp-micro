@@ -5,18 +5,16 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV PYTHONPATH=/app          
+ENV PYTHONPATH=/app
 
-# dependencias
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ----------  ¡aquí estaba el problema!  ----------
-# copia el *directorio*  app/  ⇒  /app/app/   ✅
-COPY app/ ./app
-# -----------------------------------------------
+# Copia contenidos de app/ directo a /app/ (main.py en /app/main.py)
+COPY app/ .
 
 COPY .env .
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# FIX: Cambia a "main:app" (no app.main, ya que no hay subdir app/)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

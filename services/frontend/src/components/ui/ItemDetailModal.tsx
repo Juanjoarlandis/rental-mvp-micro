@@ -2,7 +2,7 @@
 /*  src/components/ui/ItemDetailModal.tsx                                     */
 /*  – Integra reserva vía micro-servicio **rentals** + Stripe                 */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect } from "react";  // ### UPDATED: +useEffect
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
@@ -25,6 +25,12 @@ import { resolveImage } from "../../utils";
 
 import LazyImage from "./LazyImage";
 import PaymentModal from "./PaymentModal";
+
+// ### NEW: Imports para calendario
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { format, isWithinInterval, parseISO, isBefore, isAfter } from 'date-fns';
+import { api } from '../../api';  // Para fetch de availability
 
 /* ------------------- helpers (Rating, Feature, Description) --------------- */
 
@@ -106,6 +112,56 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     Velocidad: "0-2 800 rpm",
   };
 
+  /* ---------- ### NEW: Calendario y rangos ocupados ---------- */
+  const [occupiedRanges, setOccupiedRanges] = useState<{ start_at: string; end_at: string }[]>([]);
+  const [selectedRange, setSelectedRange] = useState<{ from: Date; to?: Date } | undefined>();
+  const [loadingRanges, setLoadingRanges] = useState(true);
+
+  useEffect(() => {
+    if (open && item.id) {
+      // Fetch rangos ocupados de rentals
+      api.get(`/rentals/item/${item.id}/availability`)
+        .then(res => {
+          setOccupiedRanges(res.data);
+          setLoadingRanges(false);
+        })
+        .catch(() => {
+          toast.error('No se pudo cargar la disponibilidad');
+          setLoadingRanges(false);
+        });
+    }
+  }, [open, item.id]);
+
+  // Convertir occupiedRanges a Date ranges para DayPicker
+  const disabledIntervals = occupiedRanges.map(r => ({
+    from: parseISO(r.start_at),
+    to: parseISO(r.end_at),
+  }));
+
+  // Custom onSelect: Validar no overlap con disabled
+  const handleSelect = (range: { from: Date; to?: Date } | undefined) => {
+    if (!range || !range.to) {
+      setSelectedRange(range);
+      return;
+    }
+
+    // Chequeo de overlap
+    const hasOverlap = disabledIntervals.some(interval => {
+      return (
+        isWithinInterval(range.from, interval) ||
+        isWithinInterval(range.to, interval) ||
+        (isBefore(range.from, interval.from) && isAfter(range.to, interval.to))
+      );
+    });
+
+    if (hasOverlap) {
+      toast.error('El rango seleccionado incluye fechas no disponibles. Por favor, elige otro.');
+      setSelectedRange(undefined);  // Reset
+    } else {
+      setSelectedRange(range);
+    }
+  };
+
   /* ---------- reserva ---------- */
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -115,10 +171,12 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     if (!token) return toast.error("Debes iniciar sesión primero");
     if (!item.available)
       return toast.error("Este ítem no está disponible actualmente");
+    if (!selectedRange?.from || !selectedRange.to)
+      return toast.error("Selecciona un rango de fechas válido");
 
     try {
       setLoading(true);
-      const { clientSecret } = await reserve(item.id); // crea alquiler + PaymentIntent
+      const { clientSecret } = await reserve(item.id, selectedRange.from, selectedRange.to); // ### UPDATED: Pasa fechas
       setLoading(false);
       setClientSecret(clientSecret); // abre modal de pago
     } catch (err: any) {
@@ -277,6 +335,30 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     />
                   </ul>
 
+                  {/* ### NEW: Calendario de disponibilidad */}
+                  <div className="mt-4">
+                    <h3 className="text-lg font-medium mb-2">Selecciona fechas</h3>
+                    {loadingRanges ? (
+                      <p className="text-gray-500">Cargando disponibilidad...</p>
+                    ) : (
+                      <DayPicker
+                        mode="range"
+                        selected={selectedRange}
+                        onSelect={handleSelect}  // Custom handler con validación
+                        disabled={disabledIntervals}
+                        numberOfMonths={2}
+                        modifiers={{ booked: disabledIntervals }}
+                        modifiersStyles={{ booked: { backgroundColor: 'rgba(255, 0, 0, 0.2)', color: 'red' } }}  // Estilo para ocupados
+                        fromDate={new Date()}  // No permite fechas pasadas
+                      />
+                    )}
+                    {selectedRange?.from && selectedRange.to && (
+                      <p className="mt-2 text-sm text-gray-700">
+                        Reservando desde {format(selectedRange.from, 'PPP')} hasta {format(selectedRange.to, 'PPP')}
+                      </p>
+                    )}
+                  </div>
+
                   {/* redes */}
                   <div className="mt-3 flex gap-4">
                     <Social icon={FaFacebookF} label="Facebook" />
@@ -306,7 +388,7 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                   {/* CTA – XL */}
                   <button
                     onClick={handleReserve}
-                    disabled={loading}
+                    disabled={loading || loadingRanges || !selectedRange?.to}
                     className="btn mt-4 w-full py-4 text-lg lg:max-w-xl"
                   >
                     {loading ? (

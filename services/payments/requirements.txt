@@ -3,3 +3,4 @@ uvicorn==0.35.0
 stripe==9.5.0               # SDK oficial
 python-multipart==0.0.6
 pydantic-settings==2.10.1
+slowapi==0.1.8  # MODIFIED: Añadido para rate limiting

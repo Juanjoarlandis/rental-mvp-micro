@@ -1,19 +1,26 @@
-# services/auth/requirements.txt
-# Copiamos sólo las dependencias necesarias para Auth
 fastapi==0.116.0
 uvicorn==0.35.0
+
 pydantic==2.11.7
 pydantic-core==2.33.2
 pydantic-settings==2.10.1
+
 SQLAlchemy==2.0.41
+psycopg2-binary==2.9.6
+
 python-jose[cryptography]==3.5.0
 passlib==1.7.4
 bcrypt==3.2.2
+python-multipart==0.0.6
 python-dotenv==1.1.1
-# extras (opcional para rendimiento)
+
+# rate‑limit
+slowapi==0.1.8
+
+# extras (rendimiento opc.)
 uvloop==0.21.0
 httptools==0.6.4
-email-validator==2.1.1    
-python-multipart
-psycopg2-binary==2.9.6
+email-validator==2.1.1
 alembic==1.16.4
+pytest==8.2.0
+pytest-cov==5.0.0

@@ -1,4 +1,5 @@
-import { Disclosure } from '@headlessui/react';
+/* src/components/Home/FAQ.tsx */
+import { Disclosure, Transition } from '@headlessui/react';  // +Transition
 import { ChevronUpIcon } from '@heroicons/react/24/outline';
 import Container from '../shared/Container';
 
@@ -20,15 +21,25 @@ export default function FAQ() {
             <Disclosure key={q}>
               {({ open }) => (
                 <>
-                  <Disclosure.Button className="flex w-full items-center justify-between rounded-md bg-white px-4 py-3 text-left text-sm font-medium shadow">
+                  <Disclosure.Button className="flex w-full items-center justify-between rounded-md bg-white px-4 py-3 text-left text-sm font-medium shadow transition-colors hover:bg-gray-50">
                     {q}
                     <ChevronUpIcon
-                      className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`}
+                      className={`h-5 w-5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
                     />
                   </Disclosure.Button>
-                  <Disclosure.Panel className="px-4 pt-2 text-sm text-gray-600">
-                    {a}
-                  </Disclosure.Panel>
+                  <Transition
+                    show={open}
+                    enter="transition duration-200 ease-out"
+                    enterFrom="transform scale-y-95 opacity-0"
+                    enterTo="transform scale-y-100 opacity-100"
+                    leave="transition duration-150 ease-in"
+                    leaveFrom="transform scale-y-100 opacity-100"
+                    leaveTo="transform scale-y-95 opacity-0"
+                  >
+                    <Disclosure.Panel className="px-4 pt-2 pb-4 text-sm text-gray-600">
+                      {a}
+                    </Disclosure.Panel>
+                  </Transition>
                 </>
               )}
             </Disclosure>

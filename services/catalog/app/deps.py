@@ -30,5 +30,6 @@ def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
         if not username:
             raise cred_exc
         return username
-    except JWTError:
-        raise cred_exc
+    except JWTError as e:  # MODIFIED: Granular
+        detail = "Token expirado" if "exp" in str(e) else "Token inválido"
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail)

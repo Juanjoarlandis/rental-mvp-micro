@@ -11,6 +11,8 @@ RUN npm run build          # genera /frontend/dist
 # ───────────── Etapa 2: Nginx ─────────────
 FROM nginx:1.27-alpine
 
+RUN apk add --no-cache curl  # Para healthcheck
+
 # Copia estáticos compilados
 COPY --from=builder /frontend/dist /usr/share/nginx/html
 

@@ -4,6 +4,19 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, PositiveFloat
 from typing import Literal
 
+class DateRange(BaseModel):  # ### NEW: Para rangos de disponibilidad
+    start_at: datetime
+    end_at: datetime
+
+    @field_validator("end_at")
+    @classmethod
+    def end_must_be_after_start(cls, v: datetime, info):
+        start = info.data["start_at"]
+        if v <= start:
+            raise ValueError("end_at debe ser posterior a start_at")
+        return v
+
+
 class RentalCreate(BaseModel):
     item_id: int
     start_at: datetime

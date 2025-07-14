@@ -6,7 +6,7 @@ from typing import Literal
 
 import stripe
 
-from app.core.config import settings
+from core.config import settings
 
 stripe.api_key = settings.secret_key
 

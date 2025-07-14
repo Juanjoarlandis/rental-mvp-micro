@@ -4,14 +4,14 @@ una vez confirmado que el ítem se ha devuelto.
 """
 from sqlalchemy.orm import Session
 import stripe, time
-from app.models.database import SessionLocal
-from app import crud
-from app.core.config import settings
+from models.database import SessionLocal  # FIX: Quita 'app.'
+from crud import get_by_pi, capture  # FIX: Quita 'app.'
+from core.config import settings  # FIX: Quita 'app.'
 
 def run_forever():
     while True:
         with SessionLocal() as db:          # type: Session
-            pending = db.query(crud.get_by_pi.__annotations__["return"]).filter_by(
+            pending = db.query(Payment).filter_by(  # Asume Payment importado, o ajusta
                 captured=False, refunded=False
             )
             for p in pending:
@@ -19,7 +19,7 @@ def run_forever():
                 # demo: asumimos que sí tras 2 h
                 try:
                     stripe.PaymentIntent.capture(p.stripe_pi)
-                    crud.capture(db, p)
+                    capture(db, p)
                 except Exception as e:  # noqa: BLE001
                     print("No se pudo capturar:", e)
 

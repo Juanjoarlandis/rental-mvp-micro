@@ -1,3 +1,4 @@
+/* src/components/Home/LogoCloud.tsx */
 import Container from '../shared/Container';
 
 const LOGOS = [
@@ -11,7 +12,7 @@ const LOGOS = [
 
 export default function LogoCloud() {
   return (
-    <SectionWrapper>
+    <section className="bg-gray-50 py-12">
       <Container>
         <div className="grid grid-cols-2 items-center gap-8 opacity-70 sm:grid-cols-3 lg:grid-cols-6">
           {LOGOS.map(src => (
@@ -19,16 +20,12 @@ export default function LogoCloud() {
               key={src}
               src={src}
               alt=""
-              className="mx-auto h-12 w-auto object-contain grayscale"
+              className="mx-auto h-12 w-auto object-contain grayscale transition-all duration-300 hover:grayscale-0 hover:scale-105"
               loading="lazy"
             />
           ))}
         </div>
       </Container>
-    </SectionWrapper>
+    </section>
   );
-}
-
-function SectionWrapper({ children }: { children: React.ReactNode }) {
-  return <section className="bg-gray-50 py-12">{children}</section>;
 }

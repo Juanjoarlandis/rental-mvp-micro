@@ -1,5 +1,11 @@
-# services/auth/app/api/auth.py  (versión corregida y completa)
-from fastapi import APIRouter, Depends, HTTPException, status
+# services/auth/app/api/auth.py   ← versión completa ⚡️
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,          # 👈 necesario para slowapi
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,17 +15,22 @@ from app.crud import user as crud
 from app.schemas.user import UserCreate, UserOut
 from app.schemas.token import Token
 from app.core.security import create_access_token
+from app.core.ratelimit import limiter                 # 🆕
 
-router = APIRouter(tags=["auth"])        # ← ¡sin prefix aquí!
+router = APIRouter(tags=["auth"])                      # (sin prefix aquí)
 
-
-# ───────────────────────────  SIGN-UP  ────────────────────────────
+# ─────────────────────────── SIGN-UP ────────────────────────────
 @router.post(
     "/signup",
     response_model=UserOut,
     status_code=status.HTTP_201_CREATED,
 )
-def signup(user_in: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")                             # 🆕 rate-limit
+def signup(
+    request: Request,               # 👈 obligatorio para slowapi
+    user_in: UserCreate,
+    db: Session = Depends(get_db),
+):
     """
     Registra un nuevo usuario.
 
@@ -29,7 +40,6 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
         return crud.create_user(db, user_in)
     except IntegrityError:
         db.rollback()
-        # comprobamos cuál de las dos claves únicas falló para un mensaje claro
         detail = (
             "Nombre de usuario en uso"
             if crud.get_user_by_username(db, user_in.username)
@@ -38,14 +48,16 @@ def signup(user_in: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_409_CONFLICT, detail=detail)
 
 
-# ───────────────────────────  LOGIN  ──────────────────────────────
+# ─────────────────────────── LOGIN ──────────────────────────────
 @router.post("/token", response_model=Token)
+@limiter.limit("10/minute")                            # 🆕 rate-limit
 def login_for_access_token(
+    request: Request,               # 👈 obligatorio
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
     """
-    Intercambia usuario/contraseña por un JWT (password-grant).
+    Intercambia usuario/contraseña por un JWT (password grant).
 
     • 401 si las credenciales no son válidas.
     """
@@ -61,7 +73,7 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-# ───────────────────────────  WHO AM I?  ─────────────────────────
+# ─────────────────────────── WHO AM I? ──────────────────────────
 @router.get("/users/me", response_model=UserOut)
 def read_users_me(current_user: UserOut = Depends(get_current_user)):
     """Devuelve **id, username y email** asociados al token actual."""

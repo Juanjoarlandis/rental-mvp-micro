@@ -1,654 +1,4 @@
---- services/auth/requirements.txt ---
-# services/auth/requirements.txt
-# Copiamos sólo las dependencias necesarias para Auth
-fastapi==0.116.0
-uvicorn==0.35.0
-pydantic==2.11.7
-pydantic-core==2.33.2
-pydantic-settings==2.10.1
-SQLAlchemy==2.0.41
-python-jose[cryptography]==3.5.0
-passlib==1.7.4
-bcrypt==3.2.2
-python-dotenv==1.1.1
-# extras (opcional para rendimiento)
-uvloop==0.21.0
-httptools==0.6.4
-email-validator==2.1.1    
-python-multipart
-psycopg2-binary==2.9.6
-alembic==1.16.4
-
---- services/auth/.env ---
-# services/auth/.env
-DATABASE_URL=postgresql+psycopg2://auth_user:auth_pass@auth-db:5432/auth
-SECRET_KEY=SuperClaveUltraSecreta
-
-
---- services/auth/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    build-essential libffi-dev libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# código, migraciones y configuración
-COPY app/ ./app
-COPY alembic.ini .
-COPY migrations/ ./migrations
-COPY .env .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
---- services/auth/alembic.ini ---
-# A generic, single database configuration.
-
-[alembic]
-# path to migration scripts
-script_location = migrations
-
-# template used to generate migration files
-# file_template = %%(rev)s_%%(slug)s
-
-# sys.path path, will be prepended to sys.path if present.
-# defaults to the current working directory.
-prepend_sys_path = .
-
-# timezone to use when rendering the date within the migration file
-# as well as the filename.
-# If specified, requires the python-dateutil library that can be
-# installed by adding `alembic[tz]` to the pip requirements
-# string value is passed to dateutil.tz.gettz()
-# leave blank for localtime
-# timezone =
-
-# max length of characters to apply to the
-# "slug" field
-# truncate_slug_length = 40
-
-# set to 'true' to run the environment during
-# the 'revision' command, regardless of autogenerate
-# revision_environment = false
-
-# set to 'true' to allow .pyc and .pyo files without
-# a source .py file to be detected as revisions in the
-# versions/ directory
-# sourceless = false
-
-# version location specification; This defaults
-# to migrations/versions.  When using multiple version
-# directories, initial revisions must be specified with --version-path.
-# The path separator used here should be the separator specified by "version_path_separator" below.
-# version_locations = %(here)s/bar:%(here)s/bat:migrations/versions
-
-# version path separator; As mentioned above, this is the character used to split
-# version_locations. The default within new alembic.ini files is "os", which uses os.pathsep.
-# If this key is omitted entirely, it falls back to the legacy behavior of splitting on spaces and/or commas.
-# Valid values for version_path_separator are:
-#
-# version_path_separator = :
-# version_path_separator = ;
-# version_path_separator = space
-version_path_separator = os  # Use os.pathsep. Default configuration used for new projects.
-
-# the output encoding used when revision files
-# are written from script.py.mako
-# output_encoding = utf-8
-
-# alembic.ini
-sqlalchemy.url = postgresql+psycopg2://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-
-
-
-[post_write_hooks]
-# post_write_hooks defines scripts or Python functions that are run
-# on newly generated revision scripts.  See the documentation for further
-# detail and examples
-
-# format using "black" - use the console_scripts runner, against the "black" entrypoint
-# hooks = black
-# black.type = console_scripts
-# black.entrypoint = black
-# black.options = -l 79 REVISION_SCRIPT_FILENAME
-
-# Logging configuration
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-[logger_root]
-level = WARN
-handlers = console
-qualname =
-
-[logger_sqlalchemy]
-level = WARN
-handlers =
-qualname = sqlalchemy.engine
-
-[logger_alembic]
-level = INFO
-handlers =
-qualname = alembic
-
-[handler_console]
-class = StreamHandler
-args = (sys.stderr,)
-level = NOTSET
-formatter = generic
-
-[formatter_generic]
-format = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt = %H:%M:%S
-
-
---- services/auth/migrations/script.py.mako ---
-"""${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-
-"""
-from alembic import op
-import sqlalchemy as sa
-${imports if imports else ""}
-
-# revision identifiers, used by Alembic.
-revision = ${repr(up_revision)}
-down_revision = ${repr(down_revision)}
-branch_labels = ${repr(branch_labels)}
-depends_on = ${repr(depends_on)}
-
-
-def upgrade():
-    ${upgrades if upgrades else "pass"}
-
-
-def downgrade():
-    ${downgrades if downgrades else "pass"}
-
-
---- services/auth/migrations/README ---
-Generic single-database configuration.
-
---- services/auth/migrations/env.py ---
-# migrations/env.py
-"""Alembic migration environment for the Auth service."""
-
-from __future__ import annotations
-
-from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-# ────────────────────────────────────────────────────────
-# 1. Configuración y logging
-# ────────────────────────────────────────────────────────
-config = context.config
-fileConfig(config.config_file_name)
-
-# ────────────────────────────────────────────────────────
-# 2. Metadata de modelos  → autogenerate
-# ────────────────────────────────────────────────────────
-from app.models.models import Base  # importa las tablas
-target_metadata = Base.metadata
-
-# (opcional, pero aconsejado: convenciones de nombres)
-target_metadata.naming_convention = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s",
-}
-
-# ────────────────────────────────────────────────────────
-# 3. URL de conexión: utiliza la misma que tu servicio
-# ────────────────────────────────────────────────────────
-from app.core.config import settings  # noqa: E402
-
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-# ────────────────────────────────────────────────────────
-# 4. Hooks offline / online
-# ────────────────────────────────────────────────────────
-def run_migrations_offline() -> None:
-    """Genera SQL sin tocar la BD (alembic upgrade --sql)."""
-    context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-        compare_type=True,
-        compare_server_default=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    """Aplica las migraciones sobre la BD."""
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-
-
---- services/auth/migrations/versions/20250712_init.py ---
-"""tabla users inicial
-
-Revision ID: 20250712_init
-Revises:
-Create Date: 2025-07-12 00:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-
-# revision identifiers, used by Alembic.
-revision = "20250712_init"
-down_revision = None
-branch_labels = None
-depends_on = None
-
-
-def upgrade() -> None:
-    op.create_table(
-        "users",
-        sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
-        sa.Column("username", sa.String(), nullable=False),
-        sa.Column("email", sa.String(), nullable=False),
-        sa.Column("hashed_pw", sa.String(), nullable=False),
-        sa.UniqueConstraint("username"),
-        sa.UniqueConstraint("email"),
-    )
-    op.create_index("ix_users_username", "users", ["username"])
-    op.create_index("ix_users_email", "users", ["email"])
-
-
-def downgrade() -> None:
-    op.drop_index("ix_users_email", table_name="users")
-    op.drop_index("ix_users_username", table_name="users")
-    op.drop_table("users")
-
-
---- services/auth/app/main.py ---
-# services/auth/app/main.py
-from fastapi import FastAPI
-
-from app.api import auth                     # rutas
-from app.models.database import Base, engine
-import app.models.models                     # importa modelos (no eliminar)  noqa: F401
-
-app = FastAPI(
-    title="rental-mvp – Auth Service",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-# ────────────────────────────────────────────────────────────────
-#  Crea las tablas si aún no existen (solo útil en entornos de
-#  desarrollo o en tests.  En prod usarás `alembic upgrade head`).
-# ────────────────────────────────────────────────────────────────
-@app.on_event("startup")
-def _init_db() -> None:
-    Base.metadata.create_all(bind=engine)
-
-# rutas REST
-app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-
-
---- services/auth/app/__init__.py ---
-
-
---- services/auth/app/deps.py ---
-# services/auth/app/deps.py
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from sqlalchemy.orm import Session
-
-from app.models.database import SessionLocal
-from app.core.config import settings
-from app.crud import user as crud
-from app.schemas.user import UserOut
-
-# ──────────── DB session ────────────
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ──────────── Auth helper ───────────
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/auth/token"   # el prefijo '/api/auth' se añade en main.py
-)
-
-
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> UserOut:
-    """
-    Valida el JWT y devuelve el usuario asociado.
-    Lanza 401 si es inválido o no existe.
-    """
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales no válidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str | None = payload.get("sub")
-        if not username:
-            raise cred_exc
-    except JWTError:
-        raise cred_exc
-
-    user = crud.get_user_by_username(db, username)
-    if not user:
-        raise cred_exc
-    return user
-
-
---- services/auth/app/models/models.py ---
-from sqlalchemy import Column, Integer, String
-from app.models.database import Base   # usa SIEMPRE la misma Base
-
-class User(Base):
-    __tablename__ = "users"
-    id        = Column(Integer, primary_key=True)
-    username  = Column(String, unique=True, index=True, nullable=False)
-    email     = Column(String, unique=True, index=True, nullable=False)
-    hashed_pw = Column(String, nullable=False)
-
-
---- services/auth/app/models/__init__.py ---
-
-
---- services/auth/app/models/database.py ---
-# services/auth/app/models/database.py
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from app.core.config import settings
-
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=True,
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-
---- services/auth/app/schemas/token.py ---
-# app/schemas/token.py
-from pydantic import BaseModel
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
---- services/auth/app/schemas/__init__.py ---
-from .user import UserCreate, UserOut  # noqa: F401
-
-__all__ = ["UserCreate", "UserOut"]
-
-
---- services/auth/app/schemas/user.py ---
-from pydantic import BaseModel, EmailStr, ConfigDict
-
-class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-
-
-class UserOut(BaseModel):
-    id: int
-    username: str
-    email: EmailStr
-
-    model_config = ConfigDict(from_attributes=True)  # ← en vez del viejo Config
-
-
---- services/auth/app/crud/__init__.py ---
-# services/auth/app/crud/__init__.py
-from .user import (
-    get_user_by_username,
-    get_user_by_email,
-    create_user,
-    verify_password,
-)
-
-__all__ = [
-    "get_user_by_username",
-    "get_user_by_email",
-    "create_user",
-    "verify_password",
-]
-
-
---- services/auth/app/crud/user.py ---
-# app/crud/user.py
-from __future__ import annotations
-
-import bcrypt
-from passlib.context import CryptContext
-from sqlalchemy.orm import Session
-
-from app.models.models import User
-from app.schemas.user import UserCreate
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# ───────────────────────── helpers privados ──────────────────────────────
-
-
-def _hash_password(pwd: str) -> str:
-    """Devuelve el hash seguro de *pwd* usando passlib/bcrypt."""
-    return pwd_context.hash(pwd)
-
-
-# ────────────────────────────── Lectura ───────────────────────────────────
-
-
-def get_user_by_username(db: Session, username: str) -> User | None:
-    """Busca un usuario por *username* (o None si no existe)."""
-    return db.query(User).filter(User.username == username).first()
-
-
-def get_user_by_email(db: Session, email: str) -> User | None:
-    """Busca un usuario por email (o None si no existe)."""
-    return db.query(User).filter(User.email == email).first()
-
-
-# ───────────────────────────── Escritura ──────────────────────────────────
-
-
-def create_user(db: Session, user_in: UserCreate) -> User:
-    """
-    Crea un nuevo usuario con contraseña hasheada y lo devuelve.
-    Lanza IntegrityError si el username/email ya existen.
-    """
-    db_user = User(
-        username=user_in.username,
-        email=user_in.email,
-        hashed_pw=_hash_password(user_in.password),
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-
-# ──────────────────────── Utilidades varias ──────────────────────────────
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Comprueba que *plain_password* coincide con el hash almacenado.
-    Se usa bcrypt directamente para evitar dependencias implícitas.
-    """
-    try:
-        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
-    except Exception:  # noqa: BLE001
-        # bcrypt lanza ValueError si el hash no es válido
-        return False
-
-
---- services/auth/app/core/__init__.py ---
-
-
---- services/auth/app/core/config.py ---
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Settings(BaseSettings):
-    DATABASE_URL: str
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-settings = Settings()        # instancia global
-
-
---- services/auth/app/core/security.py ---
-# app/core/security.py
-from datetime import datetime, timedelta
-from jose import jwt
-from app.core.config import settings
-
-def create_access_token(subject: str) -> str:
-    to_encode = {"sub": subject}
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-
-
---- services/auth/app/api/auth.py ---
-# services/auth/app/api/auth.py  (versión corregida y completa)
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
-from app.deps import get_db, get_current_user
-from app.crud import user as crud
-from app.schemas.user import UserCreate, UserOut
-from app.schemas.token import Token
-from app.core.security import create_access_token
-
-router = APIRouter(tags=["auth"])        # ← ¡sin prefix aquí!
-
-
-# ───────────────────────────  SIGN-UP  ────────────────────────────
-@router.post(
-    "/signup",
-    response_model=UserOut,
-    status_code=status.HTTP_201_CREATED,
-)
-def signup(user_in: UserCreate, db: Session = Depends(get_db)):
-    """
-    Registra un nuevo usuario.
-
-    • 409 si el **username** o el **email** ya existen.
-    """
-    try:
-        return crud.create_user(db, user_in)
-    except IntegrityError:
-        db.rollback()
-        # comprobamos cuál de las dos claves únicas falló para un mensaje claro
-        detail = (
-            "Nombre de usuario en uso"
-            if crud.get_user_by_username(db, user_in.username)
-            else "Email ya registrado"
-        )
-        raise HTTPException(status.HTTP_409_CONFLICT, detail=detail)
-
-
-# ───────────────────────────  LOGIN  ──────────────────────────────
-@router.post("/token", response_model=Token)
-def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-):
-    """
-    Intercambia usuario/contraseña por un JWT (password-grant).
-
-    • 401 si las credenciales no son válidas.
-    """
-    user = crud.get_user_by_username(db, form_data.username)
-    if not user or not crud.verify_password(form_data.password, user.hashed_pw):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    access_token = create_access_token(subject=user.username)
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-# ───────────────────────────  WHO AM I?  ─────────────────────────
-@router.get("/users/me", response_model=UserOut)
-def read_users_me(current_user: UserOut = Depends(get_current_user)):
-    """Devuelve **id, username y email** asociados al token actual."""
-    return current_user
-
-
-# alias corto opcional
-router.get("/me", response_model=UserOut)(read_users_me)
-
-
---- services/auth/app/api/__init__.py ---
-
-
---- services/frontend/index.html ---
+--- frontend/index.html ---
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -666,7 +16,7 @@ router.get("/me", response_model=UserOut)(read_users_me)
 </html>
 
 
---- services/frontend/package.json ---
+--- frontend/package.json ---
 {
   "name": "rental-mvp-frontend",
   "version": "0.1.0",
@@ -682,13 +32,15 @@ router.get("/me", response_model=UserOut)(read_users_me)
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.3.4",
+    "@stripe/react-stripe-js": "^2.3.0",
     "@stripe/stripe-js": "^1.53.0",
-    "@stripe/react-stripe-js": "^2.3.0",           
     "@tanstack/react-query": "^5.38.0",
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "focus-trap-react": "^10.2.1",
     "react": "^18.3.1",
+    "react-day-picker": "^9.8.0",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.60.0",
     "react-hot-toast": "^2.5.2",
@@ -719,7 +71,7 @@ router.get("/me", response_model=UserOut)(read_users_me)
 }
 
 
---- services/frontend/vite.config.ts ---
+--- frontend/vite.config.ts ---
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -727,25 +79,25 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    https: true,  // MODIFIED: HTTPS en dev (usa cert auto-firmado de Vite)
     proxy: {
-      "/api/auth":       "http://localhost:8001",
-      "/api/items":      "http://localhost:8002",
-      "/api/categories": "http://localhost:8002",
-      "/api/rentals":    "http://localhost:8003",
-      "/api/upload":     "http://localhost:8004",
-      "/api/payments":   "http://localhost:8005",
-      "/uploads":        "http://localhost:8004"
+      "/api/auth":       "https://localhost:8001",  // MODIFIED: Cambiado a HTTPS
+      "/api/items":      "https://localhost:8002",
+      "/api/categories": "https://localhost:8002",
+      "/api/rentals":    "https://localhost:8003",
+      "/api/upload":     "https://localhost:8004",
+      "/api/payments":   "https://localhost:8005",
+      "/uploads":        "https://localhost:8004"
     }
   }
 });
 
-
---- services/frontend/.env ---
+--- frontend/.env ---
 VITE_STRIPE_PK=pk_test_51RkNe1BAdmER2zaJNEdcxq6T7uBwtyGDiHaFRF5I9LjGGbbYxmvPfdffr4HLqZy753gB6ixJRFfu7HXRsntuCGyH00szhzRTcx
+FRONTEND_URL=http://frontend
 
 
-
---- services/frontend/Dockerfile ---
+--- frontend/Dockerfile ---
 # ───────────── Etapa 1: build Vite ─────────────
 FROM node:20 AS builder
 WORKDIR /frontend
@@ -759,6 +111,8 @@ RUN npm run build          # genera /frontend/dist
 # ───────────── Etapa 2: Nginx ─────────────
 FROM nginx:1.27-alpine
 
+RUN apk add --no-cache curl  # Para healthcheck
+
 # Copia estáticos compilados
 COPY --from=builder /frontend/dist /usr/share/nginx/html
 
@@ -768,41 +122,63 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
-
---- services/frontend/nginx.conf ---
+--- frontend/nginx.conf ---
 server {
     listen 80;
-    server_name 15.188.100.106;          
-    # --------- estáticos Vite ---------
+    server_name 15.188.100.106;  # O localhost para testing local
+
+    # Redirigir todo HTTP a HTTPS (opcional, pero recomendado)
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name 15.188.100.106;  # O localhost
+
+    # Self-signed certificates (montados via volumen)
+    ssl_certificate /etc/nginx/certs/selfsigned.crt;
+    ssl_certificate_key /etc/nginx/certs/selfsigned.key;
+
+    # Config básica de seguridad (sin HSTS para self-signed)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # ───────── Cabeceras comunes para upstream ─────────
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # ───────── Fichero SPA (Vite) ─────────
     root /usr/share/nginx/html;
     index index.html;
     client_max_body_size 100M;
 
+    # ───────── Health-check global ─────────
+    location = /health {
+        proxy_pass http://auth-service:8000;
+    }
+
+    # ───────── Micro-servicios ─────────
+    location /api/auth/       { proxy_pass http://auth-service:8000; }
+    location /api/items/      { proxy_pass http://catalog-service:8000; }
+    location /api/categories/ { proxy_pass http://catalog-service:8000; }
+    location /api/rentals/    { proxy_pass http://rentals-service:8000; }
+    location /api/upload/     { proxy_pass http://upload-service:8000; }
+    location /api/payments/   { proxy_pass http://payments-service:8000; }
+
+    # Ficheros subidos
+    location /uploads/        { proxy_pass http://upload-service:8000; }
+
+    # ───────── SPA fallback ─────────
     location / {
         try_files $uri $uri/ /index.html;
     }
-
-    # --------- proxy API ---------
-    location /api/auth/       { proxy_pass http://auth:8000; }
-    location /api/items/      { proxy_pass http://catalog:8000; }
-    location /api/categories/ { proxy_pass http://catalog:8000; }
-    location /api/rentals/    { proxy_pass http://rentals:8000; }
-    location /api/upload/     { proxy_pass http://upload:8000; }
-    location /api/payments/   { proxy_pass http://payments:8000; }
-
-    # --------- ficheros subidos ---------
-    location /uploads/        { proxy_pass http://upload:8000; }
-
-    # --------- cabeceras comunes ---------
-    location /api/ {
-        proxy_set_header Host            $host;
-        proxy_set_header X-Real-IP       $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
 }
 
-
---- services/frontend/tsconfig.json ---
+--- frontend/tsconfig.json ---
 {
     "compilerOptions": {
         "target": "ES2022",
@@ -828,7 +204,7 @@ server {
     ]
 }
 
---- services/frontend/postcss.config.js ---
+--- frontend/postcss.config.js ---
 // rental-mvp/frontend/postcss.config.js
 export default {
     plugins: {
@@ -838,7 +214,7 @@ export default {
 };
 
 
---- services/frontend/tailwind.config.js ---
+--- frontend/tailwind.config.js ---
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -875,7 +251,7 @@ module.exports = {
 };
 
 
---- services/frontend/src/App.tsx ---
+--- frontend/src/App.tsx ---
 // src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense } from "react";
@@ -894,6 +270,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Protected from "./Protected";
+import ForgotPassword from "./pages/ForgotPassword";    
+import ResetPassword from "./pages/ResetPassword";  
 
 import "./styles/global.css";
 
@@ -923,6 +301,8 @@ export default function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />  
+                  <Route path="/reset-password" element={<ResetPassword />} />   
                   {/* ---------- RUTA PROTEGIDA ---------- */}
                   <Route
                     path="/dashboard"
@@ -945,7 +325,7 @@ export default function App() {
 }
 
 
---- services/frontend/src/api.ts ---
+--- frontend/src/api.ts ---
 import axios from "axios";
 
 /**
@@ -958,11 +338,11 @@ export const api = axios.create({ baseURL: "/api" });
 api.interceptors.request.use(cfg => {
   const token = localStorage.getItem("token");
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  cfg.withCredentials = true;  // MODIFIED: Para CSRF si backend usa cookies (opcional)
   return cfg;
 });
 
-
---- services/frontend/src/ErrorBoundary.tsx ---
+--- frontend/src/ErrorBoundary.tsx ---
 import React, { ErrorInfo, ReactNode } from "react";
 
 type Props = { children: ReactNode };
@@ -998,7 +378,7 @@ class ErrorBoundary extends React.Component<Props, State> {
 export default ErrorBoundary;
 
 
---- services/frontend/src/main.tsx ---
+--- frontend/src/main.tsx ---
 // src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -1020,7 +400,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 );
 
 
---- services/frontend/src/utils.ts ---
+--- frontend/src/utils.ts ---
 // utils.ts
 /**
  * URL base de la API.  Ajusta en .env.local si no usas localhost:8000
@@ -1042,7 +422,7 @@ export function resolveImage(url: string | undefined, fallback: string) {
 }
 
 
---- services/frontend/src/Protected.tsx ---
+--- frontend/src/Protected.tsx ---
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 
@@ -1053,7 +433,7 @@ export default function Protected({ children }: { children: JSX.Element }) {
 }
 
 
---- services/frontend/src/assets/payments/paypal.svg ---
+--- frontend/src/assets/payments/paypal.svg ---
 <?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
 <svg width="800px" height="800px" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="24" cy="24" r="20" fill="#0070BA"/>
@@ -1062,7 +442,7 @@ export default function Protected({ children }: { children: JSX.Element }) {
 <path d="M21.6461 18.1231C21.6946 17.8105 21.895 17.5552 22.1646 17.4264C22.2879 17.3675 22.4239 17.3349 22.5678 17.3349H28.4149C29.1077 17.3349 29.7542 17.3803 30.3444 17.4757C30.513 17.5027 30.6768 17.5338 30.8367 17.5687C30.9957 17.6045 31.1508 17.6443 31.3011 17.688C31.3759 17.7103 31.4498 17.7334 31.5222 17.7564C31.8125 17.8527 32.0821 17.9664 32.331 18.0976C32.6237 16.231 32.3287 14.9601 31.3194 13.8093C30.2068 12.5424 28.1986 12 25.629 12H18.169C17.6441 12 17.1963 12.3817 17.1152 12.9011L14.0079 32.5969C13.9467 32.9866 14.2473 33.3381 14.6402 33.3381H19.2458L20.4022 26.0014L21.6461 18.1231Z" fill="white"/>
 </svg>
 
---- services/frontend/src/assets/payments/mastercard.svg ---
+--- frontend/src/assets/payments/mastercard.svg ---
 <?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
 <svg width="800px" height="800px" viewBox="0 -11 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
 <rect x="0.5" y="0.5" width="69" height="47" rx="5.5" fill="white" stroke="#D9D9D9"/>
@@ -1071,7 +451,7 @@ export default function Protected({ children }: { children: JSX.Element }) {
 <path fill-rule="evenodd" clip-rule="evenodd" d="M35.3946 13.7461C38.329 16.2784 40.1897 20.0463 40.1897 24.254C40.1897 28.4616 38.329 32.2295 35.3946 34.7618C32.4603 32.2295 30.5996 28.4616 30.5996 24.254C30.5996 20.0463 32.4603 16.2784 35.3946 13.7461Z" fill="#FF5E00"/>
 </svg>
 
---- services/frontend/src/assets/payments/visa.svg ---
+--- frontend/src/assets/payments/visa.svg ---
 <?xml version="1.0" encoding="utf-8"?>
 
 <!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
@@ -1107,7 +487,7 @@ export default function Protected({ children }: { children: JSX.Element }) {
     </g>
 </svg>
 
---- services/frontend/src/hooks/useAuth.tsx ---
+--- frontend/src/hooks/useAuth.tsx ---
 import React, { createContext, useContext, useState } from "react";
 
 /* ------------------------------------------------------------------ */
@@ -1157,7 +537,7 @@ export const useAuth = () => {
 export const getTokenLS = () => localStorage.getItem("token");
 
 
---- services/frontend/src/hooks/useStripe.ts ---
+--- frontend/src/hooks/useStripe.ts ---
 // src/hooks/useStripe.ts
 import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { useEffect, useState } from "react";
@@ -1179,7 +559,7 @@ export function useStripe() {
 }
 
 
---- services/frontend/src/styles/global.css ---
+--- frontend/src/styles/global.css ---
 /* frontend/src/styles/global.css */
 @tailwind base;
 @tailwind components;
@@ -1194,8 +574,8 @@ export function useStripe() {
 /* ---------- COMPONENTS ---------- */
 @layer components {
   /* Botones */
-  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-hover disabled:opacity-60; }
-  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/5; }
+  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md disabled:opacity-60 active:scale-95; }  /* +hover shadow, active scale */
+  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm active:scale-95; }
 
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
@@ -1203,7 +583,7 @@ export function useStripe() {
   .badge--danger { @apply badge bg-red-100 text-red-800; }
 
   /* Campos select genérico */
-  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand; }
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200; }
 
   /* Toast */
   .toast-success { @apply bg-green-600 text-white; }
@@ -1222,10 +602,34 @@ export function useStripe() {
 
   /* Oculta scrollbar (usarlo con cuidado) */
   .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* Animaciones on-scroll */
+  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+  /* Count-up para stats */
+  .count-up { counter-reset: num var(--num); }
+  .count-up::after { content: counter(num); }
+  @keyframes count { from { --num: 0; } to { --num: var(--target); } }
+}
+
+--- frontend/src/features/auth/forgot.ts ---
+import { api } from "../../api";
+
+/**
+ * Solicita el _reset_token_ para un usuario existente.
+ * Devuelve el token si la operación fue correcta (404 si no existe).
+ */
+export async function forgot(username: string): Promise<string> {
+  const { data } = await api.post<{ reset_token: string }>(
+    "/auth/password/forgot",
+    { username }
+  );
+  return data.reset_token;
 }
 
 
---- services/frontend/src/features/auth/register.ts ---
+--- frontend/src/features/auth/register.ts ---
 import { api } from "../../api";
 
 /** Lanza 400 si el username o el email ya están en uso. */
@@ -1238,7 +642,7 @@ export async function register(
 }
 
 
---- services/frontend/src/features/auth/login.ts ---
+--- frontend/src/features/auth/login.ts ---
 import { api } from "../../api";
 
 export async function login(username: string, password: string): Promise<string> {
@@ -1251,7 +655,19 @@ export async function login(username: string, password: string): Promise<string>
 }
 
 
---- services/frontend/src/features/categories/useCategories.ts ---
+--- frontend/src/features/auth/reset.ts ---
+import { api } from "../../api";
+
+/**
+ * Envía el nuevo password junto con el token recibido por “forgot”.
+ * Lanza 400 si el token es inválido / expiró.
+ */
+export async function reset(token: string, newPassword: string): Promise<void> {
+  await api.post("/auth/password/reset", { token, new_password: newPassword });
+}
+
+
+--- frontend/src/features/categories/useCategories.ts ---
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api";
 
@@ -1268,7 +684,7 @@ export default function useCategories() {
 }
 
 
---- services/frontend/src/features/items/useItems.ts ---
+--- frontend/src/features/items/useItems.ts ---
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api";
 
@@ -1302,7 +718,7 @@ export function useItems(params?: URLSearchParams) {
 }
 
 
---- services/frontend/src/features/items/AddItemModal.tsx ---
+--- frontend/src/features/items/AddItemModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/features/items/AddItemModal.tsx                                       */
 /* -------------------------------------------------------------------------- */
@@ -1663,7 +1079,7 @@ export default function AddItemModal({ open, onClose, onCreated }: Props) {
 }
 
 
---- services/frontend/src/features/items/ItemList.tsx ---
+--- frontend/src/features/items/ItemList.tsx ---
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import Container from '../../components/shared/Container';
@@ -1840,7 +1256,7 @@ const GridSkeleton = () => (
 );
 
 
---- services/frontend/src/features/rentals/reserve.ts ---
+--- frontend/src/features/rentals/reserve.ts ---
 /**
  * Orquesta todo el flujo:
  *   1) crea un alquiler              → /api/rentals/
@@ -1849,12 +1265,12 @@ const GridSkeleton = () => (
  */
 import { api } from "../../api";
 
-export async function reserve(item_id: number) {
-  // demo: 1 h desde ahora
-  const start_at = new Date().toISOString();
-  const end_at   = new Date(Date.now() + 3_600_000).toISOString();
+// ### UPDATED: Acepta fechas reales
+export async function reserve(item_id: number, start: Date, end: Date) {
+  const start_at = start.toISOString();
+  const end_at = end.toISOString();
 
-  // 1) crear alquiler
+  // 1) crear alquiler con fechas
   const { data: rental } = await api.post("/rentals/", {
     item_id,
     start_at,
@@ -1869,8 +1285,7 @@ export async function reserve(item_id: number) {
   return { clientSecret: intent.client_secret, rental };
 }
 
-
---- services/frontend/src/features/rentals/RentalList.tsx ---
+--- frontend/src/features/rentals/RentalList.tsx ---
 // src/features/rentals/RentalList.tsx
 import { useAuth } from "../../hooks/useAuth";
 import { useRentals, RentalStatus } from "./useRentals";
@@ -1931,7 +1346,7 @@ export default function RentalList() {
 }
 
 
---- services/frontend/src/features/rentals/createRental.ts ---
+--- frontend/src/features/rentals/createRental.ts ---
 // src/features/rentals/createRental.ts
 import { api } from "../../api";
 
@@ -1944,7 +1359,7 @@ export async function createRental(item_id: number,
 }
 
 
---- services/frontend/src/features/rentals/useRentals.ts ---
+--- frontend/src/features/rentals/useRentals.ts ---
 // src/features/rentals/useRentals.ts
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api";
@@ -1988,7 +1403,7 @@ export function useRentals(token: string | null) {
 }
 
 
---- services/frontend/src/features/rentals/payments/createIntent.ts ---
+--- frontend/src/features/rentals/payments/createIntent.ts ---
 // src/features/payments/createIntent.ts
 import { api } from "../../../api";
 
@@ -1998,7 +1413,7 @@ export async function createIntent(amount: number) {
 }
 
 
---- services/frontend/src/pages/Register.tsx ---
+--- frontend/src/pages/Register.tsx ---
 // src/pages/Register.tsx
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -2007,6 +1422,8 @@ import zxcvbn from "zxcvbn";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import clsx from "clsx";
+import { useEffect, useState } from "react";  // +useState for terms modal
+import { FaEye, FaEyeSlash } from "react-icons/fa";  // +eye
 
 import { register as apiRegister } from "../features/auth/register";
 import { login as apiLogin } from "../features/auth/login";
@@ -2017,16 +1434,13 @@ import SocialButton from "../components/ui/SocialButton";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
 
-/* -------- validation schema -------- */
 const schema = z
   .object({
     username: z.string().min(3, "Mín. 3 caracteres"),
     email: z.string().email("Email inválido"),
     password: z.string().min(8, "Mín. 8 caracteres"),
     confirm: z.string(),
-    terms: z.literal(true, {
-      errorMap: () => ({ message: "Acepta los términos" }),
-    }),
+    terms: z.literal(true, { errorMap: () => ({ message: "Acepta los términos" }) }),
   })
   .refine(data => data.password === data.confirm, {
     message: "Las contraseñas no coinciden",
@@ -2047,152 +1461,129 @@ export default function Register() {
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const pwd = watch("password", "");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle
+  const [showTermsModal, setShowTermsModal] = useState(false);  // NEW: Terms modal
 
-  /* -------------------------------------------------------------------- */
   const onSubmit = async (data: FormData) => {
     try {
-      // 1) signup
       await apiRegister(data.username, data.email, data.password);
-
-      // 2) auto-login
       const token = await apiLogin(data.username, data.password);
       saveToken(token);
-
       toast.success("Cuenta creada, ¡bienvenido!");
       navigate("/dashboard");
     } catch (err: any) {
-      // FastAPI devuelve detail en .response.data.detail
-      const msg =
-        err?.response?.data?.detail ??
-        "No se pudo crear la cuenta. Inténtalo más tarde.";
-      toast.error(msg);
+      toast.error(err?.response?.data?.detail ?? "No se pudo crear la cuenta.");
     }
   };
 
-  /* -------------------------------------------------------------------- */
-  const strength = zxcvbn(pwd).score; // 0-4
+  useEffect(() => {  // Fade-in
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const strength = zxcvbn(pwd);
+  const strengthColors = ['bg-red-500', 'bg-orange-400', 'bg-yellow-400', 'bg-lime-500', 'bg-green-600'];
 
   return (
     <Container>
-      <main className="flex min-h-[70vh] items-center justify-center">
-        <div className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-card">
-          <h1 className="text-center text-2xl font-bold">Crear cuenta</h1>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500">  {/* FIXED: +fade-in */}
+          <h1 className="text-center text-3xl font-bold text-gray-900">Crear cuenta</h1>
 
-          {/* ───── login social ───── */}
-          <div className="space-y-3">
-            <SocialButton provider="google" icon={FcGoogle} label="Con Google" />
-            <SocialButton provider="github" icon={FaGithub} label="Con GitHub" />
+          <div className="space-y-4">
+            <SocialButton provider="google" icon={FcGoogle} label="Continuar con Google" />
+            <SocialButton provider="github" icon={FaGithub} label="Continuar con GitHub" />
           </div>
 
-          <div className="relative text-xs text-gray-400">
-            <hr />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-2">
-              o regístrate con email
-            </span>
+          <div className="relative my-6">
+            <hr className="border-gray-300" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-4 text-sm text-gray-500">o con email</span>
           </div>
 
-          {/* ───── formulario ───── */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <input
-              {...register("username")}
-              placeholder="Nombre de usuario"
-              className="form-input w-full"
-            />
-            {errors.username && (
-              <p className="text-xs text-red-600">{errors.username.message}</p>
-            )}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="relative">
+              <label htmlFor="username" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Nombre de usuario</label>
+              <input id="username" {...register("username")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand" placeholder=" " />
+              {errors.username && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.username.message}</p>}  {/* +icon */}
+            </div>
 
-            <input
-              {...register("email")}
-              type="email"
-              placeholder="Email"
-              className="form-input w-full"
-            />
-            {errors.email && (
-              <p className="text-xs text-red-600">{errors.email.message}</p>
-            )}
+            <div className="relative">
+              <label htmlFor="email" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Email</label>
+              <input id="email" type="email" {...register("email")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand" placeholder=" " />
+              {errors.email && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.email.message}</p>}
+            </div>
 
-            <input
-              {...register("password")}
-              type="password"
-              placeholder="Contraseña"
-              className="form-input w-full"
-            />
+            <div className="relative">
+              <label htmlFor="password" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+              <input id="password" type={showPwd ? "text" : "password"} {...register("password")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand">
+                {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+              </button>
+            </div>
 
-            {/* strength meter */}
+            {/* Strength meter with tips */}
             {pwd && (
-              <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
-                <div
-                  style={{ width: `${(strength + 1) * 20}%` }}
-                  className={clsx(
-                    "h-full transition-all",
-                    [
-                      "bg-red-500",
-                      "bg-orange-400",
-                      "bg-yellow-400",
-                      "bg-lime-500",
-                      "bg-green-600",
-                    ][strength],
-                  )}
-                />
+              <div className="space-y-1">
+                <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
+                  <div style={{ width: `${(strength.score + 1) * 20}%` }} className={clsx("h-full transition-all", strengthColors[strength.score])} />
+                </div>
+                <p className="text-xs text-gray-500">{strength.feedback.suggestions.join(' ')}</p>  {/* +tips from zxcvbn */}
               </div>
             )}
-            {errors.password && (
-              <p className="text-xs text-red-600">
-                {errors.password.message}
-              </p>
-            )}
+            {errors.password && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.password.message}</p>}
 
-            <input
-              {...register("confirm")}
-              type="password"
-              placeholder="Repite contraseña"
-              className="form-input w-full"
-            />
-            {errors.confirm && (
-              <p className="text-xs text-red-600">{errors.confirm.message}</p>
-            )}
+            <div className="relative">
+              <label htmlFor="confirm" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Repite contraseña</label>
+              <input id="confirm" type={showPwd ? "text" : "password"} {...register("confirm")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+            </div>
+            {errors.confirm && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.confirm.message}</p>}
 
-            {/* terms */}
-            <label className="flex gap-2 text-xs text-gray-600">
-              <input type="checkbox" {...register("terms")} />
-              Acepto los&nbsp;
-              <a href="/terms" className="text-brand hover:underline">
-                Términos y la Política de privacidad
-              </a>
+            <label className="flex flex-wrap items-center gap-2 text-sm text-gray-600">  {/* FIXED: +flex-wrap items-center, gap-2 para better spacing */}
+              <input type="checkbox" {...register("terms")} className="rounded border-gray-300 text-brand focus:ring-brand" />
+              Acepto los <button type="button" onClick={() => setShowTermsModal(true)} className="text-brand hover:underline">Términos y Política de privacidad</button>
             </label>
-            {errors.terms && (
-              <p className="text-xs text-red-600">{errors.terms.message}</p>
-            )}
+            {errors.terms && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.terms.message}</p>}
 
-            <button className="btn w-full" disabled={isSubmitting}>
+            <button className="btn w-full rounded-lg py-3 text-base font-semibold" disabled={isSubmitting}>  {/* +styles */}
               {isSubmitting ? "Creando…" : "Crear cuenta"}
             </button>
           </form>
+
+          {/* Terms Modal (simple dialog) */}
+          {showTermsModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="max-w-md rounded-lg bg-white p-6 shadow-xl">
+                <h3 className="text-lg font-semibold">Términos y Privacidad</h3>
+                <p className="mt-2 text-sm text-gray-600">Aquí irían los términos reales. Para demo, cierra.</p>
+                <button onClick={() => setShowTermsModal(false)} className="mt-4 btn w-full">Cerrar</button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </Container>
   );
 }
 
-
---- services/frontend/src/pages/Login.tsx ---
+--- frontend/src/pages/Login.tsx ---
 // src/pages/Login.tsx
-import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { login as apiLogin } from '../features/auth/login';
-
-import { FcGoogle } from 'react-icons/fc';
-import { FaGithub } from 'react-icons/fa';
-import SocialButton from '../components/ui/SocialButton';
-import Container from '../components/shared/Container';
-import toast from 'react-hot-toast';  
+import { FormEvent, useState, useEffect } from "react";  // +useEffect para anim
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { login as apiLogin } from "../features/auth/login";
+import { FcGoogle } from "react-icons/fc";
+import { FaGithub, FaEye, FaEyeSlash } from "react-icons/fa";  // +eye icons
+import SocialButton from "../components/ui/SocialButton";
+import Container from "../components/shared/Container";
+import toast from "react-hot-toast";
+import clsx from "clsx";
 
 export default function Login() {
-  const [user, setUser] = useState('');
-  const [pwd, setPwd] = useState('');
+  const [user, setUser] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle visibility
   const [error, setError] = useState<string | null>(null);
+  const [animateError, setAnimateError] = useState(false);  // NEW: Shake anim
 
   const { login: saveToken } = useAuth();
   const nav = useNavigate();
@@ -2200,69 +1591,96 @@ export default function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-  const token = await apiLogin(user, pwd);
-  saveToken(token);
-  nav('/dashboard');
-  toast.success('¡Bienvenido de nuevo!');            // 🆕
-} catch {
-  toast.error('Usuario o contraseña incorrectos');   // 🆕
-}
+      const token = await apiLogin(user.trim(), pwd);
+      saveToken(token);
+      nav("/dashboard");
+      toast.success("¡Bienvenido de nuevo!");
+      setError(null);
+    } catch {
+      toast.error("Usuario o contraseña incorrectos");
+      setError("Credenciales inválidas");
+      setAnimateError(true);
+      setTimeout(() => setAnimateError(false), 300);  // Reset anim
+    }
   }
+
+  useEffect(() => {  // Fade-in anim on mount
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <Container>
-      <main className="flex min-h-[70vh] items-center justify-center">
-        <div className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-card">
-          {/* Título */}
-          <h1 className="text-center text-2xl font-bold">Iniciar sesión</h1>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">  {/* +bg for pro look */}
+        <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500">  {/* FIXED: +fade-in */}
+          <h1 className="text-center text-3xl font-bold text-gray-900">Iniciar sesión</h1>  {/* +text-3xl */}
 
-          {/* Social login */}
-          <div className="space-y-3">
-            <SocialButton
-              provider="google"
-              icon={FcGoogle}
-              label="Entrar con Google"
-            />
-            <SocialButton
-              provider="github"
-              icon={FaGithub}
-              label="Entrar con GitHub"
-            />
+          {/* ---------- Login social ---------- */}
+          <div className="space-y-4">
+            <SocialButton provider="google" icon={FcGoogle} label="Continuar con Google" />  {/* Updated label */}
+            <SocialButton provider="github" icon={FaGithub} label="Continuar con GitHub" />
           </div>
 
-          <div className="relative">
-            <hr />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-2 text-xs text-gray-400">
-              o continúa con tu cuenta
-            </span>
+          <div className="relative my-6">
+            <hr className="border-gray-300" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-4 text-sm text-gray-500">o con email</span>  {/* +text-sm */}
           </div>
 
-          {/* Form tradicional */}
-          {error && <p className="text-center text-sm text-red-600">{error}</p>}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              className="form-input w-full"
-              placeholder="Usuario"
-              value={user}
-              onChange={e => setUser(e.target.value)}
-              required
-            />
-            <input
-              className="form-input w-full"
-              type="password"
-              placeholder="Contraseña"
-              value={pwd}
-              onChange={e => setPwd(e.target.value)}
-              required
-            />
-            <button className="btn w-full">Entrar</button>
+          {/* ---------- Formulario ---------- */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="relative">
+              <label htmlFor="user" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Usuario</label>  {/* Floating label */}
+              <input
+                id="user"
+                className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand"
+                placeholder=" "
+                value={user}
+                onChange={e => setUser(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="relative">
+              <label htmlFor="pwd" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+              <input
+                id="pwd"
+                type={showPwd ? "text" : "password"}
+                className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10"  
+                placeholder=" "
+                value={pwd}
+                onChange={e => setPwd(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand"
+              >
+                {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {error && (
+              <p className={clsx("text-center text-sm text-red-600 error-shake", animateError && "animate-shake")}>{error}</p> 
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm">  {/* FIXED: flex-col en mobile, gap-2 para spacing */}
+              <label className="flex items-center gap-2">
+                <input type="checkbox" className="rounded border-gray-300 text-brand focus:ring-brand" />
+                Recordarme
+              </label>
+              <Link to="/forgot-password" className="text-brand hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
+            <button className="btn w-full rounded-lg py-3 text-base font-semibold">  {/* +py-3, text-base */}
+              Entrar
+            </button>
           </form>
 
-          <p className="text-center text-xs text-gray-500">
-            ¿No tienes cuenta?{' '}
-            <a href="/register" className="font-medium text-brand hover:underline">
-              Regístrate
-            </a>
+          <p className="text-center text-sm text-gray-500">
+            ¿No tienes cuenta? <Link to="/register" className="text-brand font-medium hover:underline">Regístrate</Link>
           </p>
         </div>
       </main>
@@ -2270,8 +1688,7 @@ export default function Login() {
   );
 }
 
-
---- services/frontend/src/pages/Dashboard.tsx ---
+--- frontend/src/pages/Dashboard.tsx ---
 import Container from '../components/shared/Container';
 import ItemList from '../features/items/ItemList';
 import RentalList from '../features/rentals/RentalList';
@@ -2292,10 +1709,8 @@ export default function Dashboard() {
 }
 
 
---- services/frontend/src/pages/Home.tsx ---
-/* -------------------------------------------------------------------------- */
-/*  src/pages/Home.tsx                                                        */
-/* -------------------------------------------------------------------------- */
+--- frontend/src/pages/Home.tsx ---
+/* src/pages/Home.tsx */
 import { Link } from 'react-router-dom';
 import {
   ArrowRightIcon,
@@ -2303,7 +1718,12 @@ import {
   CloudArrowUpIcon,
   CalendarDaysIcon,
   BanknotesIcon,
+  ShieldCheckIcon,  // NEW: Para benefits
+  UsersIcon,        // NEW
+  GlobeAltIcon,     // NEW
 } from '@heroicons/react/24/solid';
+import { useEffect, useRef } from 'react';  // NEW: Para animaciones
+import clsx from 'clsx';
 
 import Container from '../components/shared/Container';
 import Section from '../components/shared/Section';
@@ -2313,36 +1733,94 @@ import LogoCloud from '../components/Home/LogoCloud';
 import Testimonials from '../components/Home/Testimonials';
 import FAQ from '../components/Home/FAQ';
 
-export default function Home() {
-  /* Pasos del “cómo funciona” con su icono */
-  const STEPS = [
-    {
-      title: 'Publica',
-      desc: 'Sube tu producto, ponle precio y límites de uso.',
-      icon: CloudArrowUpIcon,
-    },
-    {
-      title: 'Reserva',
-      desc: 'Los usuarios pagan la fianza y reservan al instante.',
-      icon: CalendarDaysIcon,
-    },
-    {
-      title: 'Gana',
-      desc: 'Entregas el ítem, recibes el pago y valoraciones ⭐',
-      icon: BanknotesIcon,
-    },
+// NEW: Sección Benefits
+const Benefits = () => {
+  const BENEFITS = [
+    { icon: ShieldCheckIcon, title: 'Seguro y confiable', desc: 'Pagos protegidos con Stripe y verificación de usuarios.' },
+    { icon: UsersIcon, title: 'Comunidad local', desc: 'Conecta con vecinos y reduce huella ecológica.' },
+    { icon: GlobeAltIcon, title: 'Fácil de usar', desc: 'Publica en minutos, reserva al instante.' },
   ];
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+    Array.from(el.querySelectorAll('.fade-in')).forEach(child => io.observe(child));
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Section title="Beneficios">
+      <Container>
+        <div ref={ref} className="grid gap-8 md:grid-cols-3">
+          {BENEFITS.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="fade-in text-center space-y-2 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">
+              <Icon className="mx-auto h-12 w-12 text-brand" />
+              <h3 className="text-xl font-semibold">{title}</h3>
+              <p className="text-gray-600">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </Container>
+    </Section>
+  );
+};
+
+const STEPS = [  // Updated: Cards con shadows
+  {
+    title: 'Publica',
+    desc: 'Sube tu producto, ponle precio y límites de uso.',
+    icon: CloudArrowUpIcon,
+  },
+  {
+    title: 'Reserva',
+    desc: 'Los usuarios pagan la fianza y reservan al instante.',
+    icon: CalendarDaysIcon,
+  },
+  {
+    title: 'Gana',
+    desc: 'Entregas el ítem, recibes el pago y valoraciones ⭐',
+    icon: BanknotesIcon,
+  },
+];
+
+export default function Home() {
+  const stepsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {  // Animación para steps
+    const el = stepsRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          Array.from(e.target.children).forEach((child, i) => {
+            child.classList.add('visible');
+            (child as HTMLElement).style.transitionDelay = `${i * 0.2}s`;
+          });
+        }
+      });
+    }, { threshold: 0.2 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   return (
     <>
-      {/* ---------- HERO ---------- */}
-      <section className="relative isolate overflow-hidden bg-brand text-white">
-        {/* background blur blob */}
-        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
+      {/* ---------- HERO (mejorado: gradient bg, animación fade-in) ---------- */}
+      <section className="relative isolate overflow-hidden bg-gradient-to-br from-brand to-brand-hover text-white py-32">  {/* +gradient */}
+        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl animate-pulse" />  {/* +animate-pulse */}
 
         <Container>
-          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center">
-            <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight">
+          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center fade-in visible">  {/* +fade-in */}
+            <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight md:text-6xl">  {/* +md:text-6xl */}
               Dónde tus cosas <br className="hidden sm:inline" />
               <span className="text-white/80">cambian de mano</span>
             </h1>
@@ -2364,7 +1842,7 @@ export default function Home() {
           </div>
         </Container>
 
-        {/* wave separator */}
+        {/* wave separator (más suave) */}
         <svg
           aria-hidden
           viewBox="0 0 1440 120"
@@ -2378,18 +1856,21 @@ export default function Home() {
         </svg>
       </section>
 
-      {/* ---------- STATS ---------- */}
+      {/* ---------- STATS (ya animado) ---------- */}
       <Stats />
 
-      {/* ---------- LOGO CLOUD ---------- */}
+      {/* ---------- LOGO CLOUD (con hover) ---------- */}
       <LogoCloud />
 
-      {/* ---------- CÓMO FUNCIONA ---------- */}
+      {/* ---------- BENEFITS (nueva sección) ---------- */}
+      <Benefits />
+
+      {/* ---------- CÓMO FUNCIONA (cards con animaciones secuenciales) ---------- */}
       <Section title="¿Cómo funciona?">
         <Container>
-          <div className="grid gap-12 md:grid-cols-3">
+          <div ref={stepsRef} className="grid gap-12 md:grid-cols-3">
             {STEPS.map(({ title, desc, icon: Icon }) => (
-              <div key={title} className="space-y-4 text-center">
+              <div key={title} className="fade-in text-center space-y-4 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">  {/* +cards */}
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
                   <Icon className="h-6 w-6 text-brand" />
                 </div>
@@ -2401,20 +1882,20 @@ export default function Home() {
         </Container>
       </Section>
 
-      {/* ---------- TESTIMONIOS ---------- */}
+      {/* ---------- TESTIMONIALS (mejorado: grid responsivo) ---------- */}
       <Testimonials />
 
-      {/* ---------- FAQ ---------- */}
+      {/* ---------- FAQ (con iconos y transiciones) ---------- */}
       <FAQ />
 
-      {/* ---------- CTA FINAL ---------- */}
-      <section className="bg-brand py-16 text-center text-white">
+      {/* ---------- CTA FINAL (con animación) ---------- */}
+      <section className="bg-brand py-16 text-center text-white fade-in">
         <Container>
           <h2 className="mb-6 text-3xl font-bold">
             ¿Listo para estrenar ingresos extra?
           </h2>
-          <Link to="/register" className="btn">
-            Crear cuenta gratis
+          <Link to="/register" className="btn inline-flex gap-2">
+            Crear cuenta gratis <ArrowRightIcon className="h-5 w-5" />
           </Link>
         </Container>
       </section>
@@ -2422,8 +1903,175 @@ export default function Home() {
   );
 }
 
+--- frontend/src/pages/ForgotPassword.tsx ---
+import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
---- services/frontend/src/components/ui/PaymentModal.tsx ---
+import Container from "../components/shared/Container";
+import { forgot } from "../features/auth/forgot";
+
+export default function ForgotPassword() {
+  const [user, setUser] = useState("");
+  const [loading, setLoading] = useState(false);
+  const nav = useNavigate();
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const token = await forgot(user.trim());
+      toast.success("Token generado: revisa tu correo (demo: consola)");
+      console.info("🔑 reset_token =", token);   // ← visible en consola dev
+      nav(`/reset-password?token=${token}`);
+    } catch (err: any) {
+      setLoading(false);
+      const msg =
+        err?.response?.status === 404
+          ? "Usuario no encontrado"
+          : err?.response?.data?.detail ?? "Error inesperado";
+      toast.error(msg);
+    }
+  }
+
+  return (
+    <Container>
+      <main className="flex min-h-[70vh] items-center justify-center">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-card"
+        >
+          <h1 className="text-center text-2xl font-bold">
+            Restablecer contraseña
+          </h1>
+
+          <input
+            value={user}
+            onChange={e => setUser(e.target.value)}
+            placeholder="Nombre de usuario"
+            className="form-input w-full"
+            required
+          />
+
+          <button className="btn w-full" disabled={loading}>
+            {loading ? "Enviando…" : "Generar enlace"}
+          </button>
+        </form>
+      </main>
+    </Container>
+  );
+}
+
+
+--- frontend/src/pages/ResetPassword.tsx ---
+// src/pages/ResetPassword.tsx
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import toast from "react-hot-toast";
+import { useEffect, useState } from "react";  // +useState for toggle
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+
+import Container from "../components/shared/Container";
+import { reset } from "../features/auth/reset";
+import clsx from "clsx";
+import zxcvbn from "zxcvbn";  // +strength
+
+const schema = z
+  .object({
+    password: z.string().min(8, "Mínimo 8 caracteres"),
+    confirm: z.string()
+  })
+  .refine(d => d.password === d.confirm, {
+    message: "No coincide",
+    path: ["confirm"]
+  });
+
+type Form = z.infer<typeof schema>;
+
+export default function ResetPassword() {
+  const [params] = useSearchParams();
+  const tokenQP = params.get("token") ?? "";
+  const nav = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm<Form>({
+    resolver: zodResolver(schema)
+  });
+
+  const pwd = watch("password", "");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle
+
+  const onSubmit = async (data: Form) => {
+    try {
+      await reset(tokenQP, data.password);
+      toast.success("Contraseña actualizada");
+      nav("/login");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Token inválido o expirado.");
+    }
+  };
+
+  useEffect(() => {  // Fade-in
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const strength = zxcvbn(pwd);
+  const strengthColors = ['bg-red-500', 'bg-orange-400', 'bg-yellow-400', 'bg-lime-500', 'bg-green-600'];
+
+  return (
+    <Container>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500"  // FIXED: +fade-in
+        >
+          <h1 className="text-center text-3xl font-bold text-gray-900">Nueva contraseña</h1>
+
+          <div className="relative">
+            <label htmlFor="password" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+            <input id="password" type={showPwd ? "text" : "password"} {...register("password")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+            <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand">
+              {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {pwd && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
+                <div style={{ width: `${(strength.score + 1) * 20}%` }} className={clsx("h-full transition-all", strengthColors[strength.score])} />
+              </div>
+              <p className="text-xs text-gray-500">{strength.feedback.suggestions.join(' ')}</p>
+            </div>
+          )}
+          {errors.password && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.password.message}</p>}
+
+          <div className="relative">
+            <label htmlFor="confirm" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Repite contraseña</label>
+            <input id="confirm" type={showPwd ? "text" : "password"} {...register("confirm")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+          </div>
+          {errors.confirm && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.confirm.message}</p>}
+
+          <button className="btn w-full rounded-lg py-3 text-base font-semibold" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando…" : "Cambiar contraseña"}
+          </button>
+
+          <p className="text-center text-sm text-gray-500">
+            ¿Recordaste tu clave? <Link to="/login" className="text-brand font-medium hover:underline">Iniciar sesión</Link>
+          </p>
+        </form>
+      </main>
+    </Container>
+  );
+}
+
+--- frontend/src/components/ui/PaymentModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/PaymentModal.tsx                                        */
 /* -------------------------------------------------------------------------- */
@@ -2576,7 +2224,7 @@ function CheckoutForm({
 }
 
 
---- services/frontend/src/components/ui/SkeletonCard.tsx ---
+--- frontend/src/components/ui/SkeletonCard.tsx ---
 export default function SkeletonCard() {
   return (
     <article
@@ -2598,7 +2246,7 @@ export default function SkeletonCard() {
 }
 
 
---- services/frontend/src/components/ui/LazyImage.tsx ---
+--- frontend/src/components/ui/LazyImage.tsx ---
 import { useState } from 'react';
 
 type Props = {
@@ -2639,7 +2287,7 @@ export default function LazyImage({
 }
 
 
---- services/frontend/src/components/ui/ItemCard.tsx ---
+--- frontend/src/components/ui/ItemCard.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/ItemCard.tsx                                            */
 /* -------------------------------------------------------------------------- */
@@ -2749,7 +2397,7 @@ function IconBtn({
 }
 
 
---- services/frontend/src/components/ui/SearchBar.tsx ---
+--- frontend/src/components/ui/SearchBar.tsx ---
 import { useForm } from 'react-hook-form';
 
 type Props = { onSubmit: (q: URLSearchParams) => void };
@@ -2809,12 +2457,12 @@ export default function SearchBar({ onSubmit }: Props) {
 }
 
 
---- services/frontend/src/components/ui/ItemDetailModal.tsx ---
+--- frontend/src/components/ui/ItemDetailModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/ItemDetailModal.tsx                                     */
 /*  – Integra reserva vía micro-servicio **rentals** + Stripe                 */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect } from "react";  // ### UPDATED: +useEffect
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
@@ -2837,6 +2485,12 @@ import { resolveImage } from "../../utils";
 
 import LazyImage from "./LazyImage";
 import PaymentModal from "./PaymentModal";
+
+// ### NEW: Imports para calendario
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { format, isWithinInterval, parseISO, isBefore, isAfter } from 'date-fns';
+import { api } from '../../api';  // Para fetch de availability
 
 /* ------------------- helpers (Rating, Feature, Description) --------------- */
 
@@ -2918,6 +2572,56 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     Velocidad: "0-2 800 rpm",
   };
 
+  /* ---------- ### NEW: Calendario y rangos ocupados ---------- */
+  const [occupiedRanges, setOccupiedRanges] = useState<{ start_at: string; end_at: string }[]>([]);
+  const [selectedRange, setSelectedRange] = useState<{ from: Date; to?: Date } | undefined>();
+  const [loadingRanges, setLoadingRanges] = useState(true);
+
+  useEffect(() => {
+    if (open && item.id) {
+      // Fetch rangos ocupados de rentals
+      api.get(`/rentals/item/${item.id}/availability`)
+        .then(res => {
+          setOccupiedRanges(res.data);
+          setLoadingRanges(false);
+        })
+        .catch(() => {
+          toast.error('No se pudo cargar la disponibilidad');
+          setLoadingRanges(false);
+        });
+    }
+  }, [open, item.id]);
+
+  // Convertir occupiedRanges a Date ranges para DayPicker
+  const disabledIntervals = occupiedRanges.map(r => ({
+    from: parseISO(r.start_at),
+    to: parseISO(r.end_at),
+  }));
+
+  // Custom onSelect: Validar no overlap con disabled
+  const handleSelect = (range: { from: Date; to?: Date } | undefined) => {
+    if (!range || !range.to) {
+      setSelectedRange(range);
+      return;
+    }
+
+    // Chequeo de overlap
+    const hasOverlap = disabledIntervals.some(interval => {
+      return (
+        isWithinInterval(range.from, interval) ||
+        isWithinInterval(range.to, interval) ||
+        (isBefore(range.from, interval.from) && isAfter(range.to, interval.to))
+      );
+    });
+
+    if (hasOverlap) {
+      toast.error('El rango seleccionado incluye fechas no disponibles. Por favor, elige otro.');
+      setSelectedRange(undefined);  // Reset
+    } else {
+      setSelectedRange(range);
+    }
+  };
+
   /* ---------- reserva ---------- */
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -2927,10 +2631,12 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     if (!token) return toast.error("Debes iniciar sesión primero");
     if (!item.available)
       return toast.error("Este ítem no está disponible actualmente");
+    if (!selectedRange?.from || !selectedRange.to)
+      return toast.error("Selecciona un rango de fechas válido");
 
     try {
       setLoading(true);
-      const { clientSecret } = await reserve(item.id); // crea alquiler + PaymentIntent
+      const { clientSecret } = await reserve(item.id, selectedRange.from, selectedRange.to); // ### UPDATED: Pasa fechas
       setLoading(false);
       setClientSecret(clientSecret); // abre modal de pago
     } catch (err: any) {
@@ -3089,6 +2795,30 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     />
                   </ul>
 
+                  {/* ### NEW: Calendario de disponibilidad */}
+                  <div className="mt-4">
+                    <h3 className="text-lg font-medium mb-2">Selecciona fechas</h3>
+                    {loadingRanges ? (
+                      <p className="text-gray-500">Cargando disponibilidad...</p>
+                    ) : (
+                      <DayPicker
+                        mode="range"
+                        selected={selectedRange}
+                        onSelect={handleSelect}  // Custom handler con validación
+                        disabled={disabledIntervals}
+                        numberOfMonths={2}
+                        modifiers={{ booked: disabledIntervals }}
+                        modifiersStyles={{ booked: { backgroundColor: 'rgba(255, 0, 0, 0.2)', color: 'red' } }}  // Estilo para ocupados
+                        fromDate={new Date()}  // No permite fechas pasadas
+                      />
+                    )}
+                    {selectedRange?.from && selectedRange.to && (
+                      <p className="mt-2 text-sm text-gray-700">
+                        Reservando desde {format(selectedRange.from, 'PPP')} hasta {format(selectedRange.to, 'PPP')}
+                      </p>
+                    )}
+                  </div>
+
                   {/* redes */}
                   <div className="mt-3 flex gap-4">
                     <Social icon={FaFacebookF} label="Facebook" />
@@ -3118,7 +2848,7 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                   {/* CTA – XL */}
                   <button
                     onClick={handleReserve}
-                    disabled={loading}
+                    disabled={loading || loadingRanges || !selectedRange?.to}
                     className="btn mt-4 w-full py-4 text-lg lg:max-w-xl"
                   >
                     {loading ? (
@@ -3170,8 +2900,7 @@ function Social({
   );
 }
 
-
---- services/frontend/src/components/ui/SocialButton.tsx ---
+--- frontend/src/components/ui/SocialButton.tsx ---
 // src/components/ui/SocialButton.tsx
 import { IconType } from 'react-icons';
 import clsx from 'clsx';
@@ -3199,7 +2928,7 @@ export default function SocialButton({ icon: Icon, label, provider }: Props) {
 }
 
 
---- services/frontend/src/components/ui/QuickViewModal.tsx ---
+--- frontend/src/components/ui/QuickViewModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/QuickViewModal.tsx                                      */
 /*  – permite reservar el ítem vía micro-servicio **rentals** + Stripe        */
@@ -3398,7 +3127,7 @@ export default function QuickViewModal({ open, onClose, item }: Props) {
 }
 
 
---- services/frontend/src/components/shared/Section.tsx ---
+--- frontend/src/components/shared/Section.tsx ---
 type Props = {
   title?: string;
   children: React.ReactNode;
@@ -3417,13 +3146,13 @@ export default function Section({ title, children, id }: Props) {
 }
 
 
---- services/frontend/src/components/shared/Container.tsx ---
+--- frontend/src/components/shared/Container.tsx ---
 export default function Container({ children }: { children: React.ReactNode }) {
   return <div className="container">{children}</div>;
 }
 
 
---- services/frontend/src/components/layout/Footer.tsx ---
+--- frontend/src/components/layout/Footer.tsx ---
 export default function Footer() {
   return (
     <footer className="mt-24 border-t bg-white py-12 text-center text-sm text-gray-500">
@@ -3433,7 +3162,7 @@ export default function Footer() {
 }
 
 
---- services/frontend/src/components/layout/Header.tsx ---
+--- frontend/src/components/layout/Header.tsx ---
 // src/components/layout/Header.tsx
 import { Link, NavLink } from 'react-router-dom';
 import { Disclosure } from '@headlessui/react';
@@ -3549,8 +3278,9 @@ export default function Header() {
 }
 
 
---- services/frontend/src/components/Home/FAQ.tsx ---
-import { Disclosure } from '@headlessui/react';
+--- frontend/src/components/Home/FAQ.tsx ---
+/* src/components/Home/FAQ.tsx */
+import { Disclosure, Transition } from '@headlessui/react';  // +Transition
 import { ChevronUpIcon } from '@heroicons/react/24/outline';
 import Container from '../shared/Container';
 
@@ -3572,15 +3302,25 @@ export default function FAQ() {
             <Disclosure key={q}>
               {({ open }) => (
                 <>
-                  <Disclosure.Button className="flex w-full items-center justify-between rounded-md bg-white px-4 py-3 text-left text-sm font-medium shadow">
+                  <Disclosure.Button className="flex w-full items-center justify-between rounded-md bg-white px-4 py-3 text-left text-sm font-medium shadow transition-colors hover:bg-gray-50">
                     {q}
                     <ChevronUpIcon
-                      className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`}
+                      className={`h-5 w-5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
                     />
                   </Disclosure.Button>
-                  <Disclosure.Panel className="px-4 pt-2 text-sm text-gray-600">
-                    {a}
-                  </Disclosure.Panel>
+                  <Transition
+                    show={open}
+                    enter="transition duration-200 ease-out"
+                    enterFrom="transform scale-y-95 opacity-0"
+                    enterTo="transform scale-y-100 opacity-100"
+                    leave="transition duration-150 ease-in"
+                    leaveFrom="transform scale-y-100 opacity-100"
+                    leaveTo="transform scale-y-95 opacity-0"
+                  >
+                    <Disclosure.Panel className="px-4 pt-2 pb-4 text-sm text-gray-600">
+                      {a}
+                    </Disclosure.Panel>
+                  </Transition>
                 </>
               )}
             </Disclosure>
@@ -3591,8 +3331,8 @@ export default function FAQ() {
   );
 }
 
-
---- services/frontend/src/components/Home/Stats.tsx ---
+--- frontend/src/components/Home/Stats.tsx ---
+/* src/components/Home/Stats.tsx */
 import { useEffect, useRef, useState } from 'react';
 import Container from '../shared/Container';
 
@@ -3603,7 +3343,6 @@ const DATA = [
 ];
 
 export default function Stats() {
-  /* animate on scroll into view */
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -3624,8 +3363,11 @@ export default function Stats() {
         <div className="grid gap-8 sm:grid-cols-3">
           {DATA.map(({ label, value }) => (
             <div key={label} className="text-center">
-              <p className="text-4xl font-extrabold text-brand">
-                {visible ? value.toLocaleString() : '0'}
+              <p
+                className="text-4xl font-extrabold text-brand"
+                style={visible ? { '--target': value, animation: 'count 2s ease-out forwards' } as React.CSSProperties : {}}
+              >
+                {visible ? '' : '0'}
               </p>
               <p className="mt-2 text-sm font-medium text-gray-600">{label}</p>
             </div>
@@ -3636,8 +3378,8 @@ export default function Stats() {
   );
 }
 
-
---- services/frontend/src/components/Home/LogoCloud.tsx ---
+--- frontend/src/components/Home/LogoCloud.tsx ---
+/* src/components/Home/LogoCloud.tsx */
 import Container from '../shared/Container';
 
 const LOGOS = [
@@ -3651,7 +3393,7 @@ const LOGOS = [
 
 export default function LogoCloud() {
   return (
-    <SectionWrapper>
+    <section className="bg-gray-50 py-12">
       <Container>
         <div className="grid grid-cols-2 items-center gap-8 opacity-70 sm:grid-cols-3 lg:grid-cols-6">
           {LOGOS.map(src => (
@@ -3659,22 +3401,18 @@ export default function LogoCloud() {
               key={src}
               src={src}
               alt=""
-              className="mx-auto h-12 w-auto object-contain grayscale"
+              className="mx-auto h-12 w-auto object-contain grayscale transition-all duration-300 hover:grayscale-0 hover:scale-105"
               loading="lazy"
             />
           ))}
         </div>
       </Container>
-    </SectionWrapper>
+    </section>
   );
 }
 
-function SectionWrapper({ children }: { children: React.ReactNode }) {
-  return <section className="bg-gray-50 py-12">{children}</section>;
-}
-
-
---- services/frontend/src/components/Home/Testimonials.tsx ---
+--- frontend/src/components/Home/Testimonials.tsx ---
+/* src/components/Home/Testimonials.tsx */
 import Container from '../shared/Container';
 
 const TESTIMONIALS = [
@@ -3697,16 +3435,15 @@ const TESTIMONIALS = [
 
 export default function Testimonials() {
   return (
-    <SectionWrapper>
+    <section className="bg-white py-16">
       <Container>
         <h2 className="mb-10 text-center text-3xl font-bold">Historias reales</h2>
 
-        {/* slider */}
-        <div className="flex snap-x gap-6 overflow-x-auto pb-4 sm:justify-center">
+        <div className="grid gap-6 md:grid-cols-3">  {/* NEW: Grid en lugar de scroll */}
           {TESTIMONIALS.map(t => (
             <article
               key={t.name}
-              className="snap-center shrink-0 rounded-xl bg-white p-6 shadow-card sm:w-80"
+              className="rounded-xl bg-white p-6 shadow-card transition-shadow hover:shadow-md"
             >
               <div className="flex items-center gap-3">
                 <img
@@ -3722,16 +3459,11 @@ export default function Testimonials() {
           ))}
         </div>
       </Container>
-    </SectionWrapper>
+    </section>
   );
 }
 
-function SectionWrapper({ children }: { children: React.ReactNode }) {
-  return <section className="bg-white py-16">{children}</section>;
-}
-
-
---- services/frontend/src/components/filters/FiltersSidebar.tsx ---
+--- frontend/src/components/filters/FiltersSidebar.tsx ---
 import { Disclosure } from '@headlessui/react';
 import useCategories, { Category } from '../../features/categories/useCategories';
 
@@ -3861,2557 +3593,5 @@ export default function FiltersSidebar({ value, onChange, onReset }: Props) {
     </div>
   );
 }
-
-
---- services/rentals/requirements.txt ---
-fastapi==0.116.0
-uvicorn==0.35.0
-
-pydantic==2.11.7
-pydantic-core==2.33.2
-pydantic-settings==2.10.1
-
-SQLAlchemy==2.0.41
-psycopg2-binary==2.9.9          # ← Postgres
-
-python-jose[cryptography]==3.5.0
-python-dotenv==1.1.1
-
-httpx==0.27.0                   # 🔥 llamadas al micro-servicio Catálogo
-
-alembic==1.16.4
-email-validator==2.1.1
-
-# rendimiento opc.
-uvloop==0.21.0
-httptools==0.6.4
-
-
---- services/rentals/.env ---
-# DB propia del micro-servicio
-DATABASE_URL=postgresql+psycopg2://rentals_user:rentals_pass@rentals-db:5432/rentals
-
-# usamos la misma clave/algoritmo que los otros servicios para validar JWT
-SECRET_KEY=SuperClaveUltraSecreta
-ALGORITHM=HS256
-
-# URL interna para hablar con Catalog
-CATALOG_API_BASE=http://catalog:8000/api
-
-
---- services/rentals/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# código + alembic + configuración
-COPY app/          ./app
-COPY alembic.ini   .
-COPY migrations/   ./migrations
-COPY .env          .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
---- services/rentals/alembic.ini ---
-[alembic]
-script_location = migrations
-prepend_sys_path = .
-sqlalchemy.url = postgresql+psycopg2://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-version_path_separator = os
-
-
-# ────────────── Logging ──────────────
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-[logger_root]
-level    = WARN
-handlers = console
-qualname =
-
-[logger_sqlalchemy]
-level     = WARN
-handlers  =
-qualname  = sqlalchemy.engine
-
-[logger_alembic]
-level     = INFO
-handlers  =
-qualname  = alembic
-
-[handler_console]
-class     = StreamHandler
-args      = (sys.stderr,)
-level     = NOTSET
-formatter = generic
-
-[formatter_generic]
-format   = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt  = %H:%M:%S
-
-
---- services/rentals/test_rentals.sh ---
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
-AUTH=http://localhost:8001/api/auth
-CAT=http://localhost:8002/api
-REN=http://localhost:8003/api/rentals
-
-USER=alice
-MAIL=alice@example.com
-PASS=secret
-
-j() { jq -C .; }          # pretty-json coloreado
-auth() { curl -s "$@" "${HDR[@]}"; }
-
-echo "──── 1) signup ────"
-curl -s -X POST $AUTH/signup \
-     -H 'Content-Type: application/json' \
-     -d "{\"username\":\"$USER\",\"email\":\"$MAIL\",\"password\":\"$PASS\"}" \
-  | j || echo "(ya existe)"
-
-echo "──── 2) login ─────"
-TOKEN=$(curl -s -X POST $AUTH/token \
-              -H 'Content-Type: application/x-www-form-urlencoded' \
-              -d "username=$USER&password=$PASS" | jq -r .access_token)
-HDR=(-H "Authorization: Bearer $TOKEN")
-echo "JWT: $TOKEN"
-
-echo "──── 3) category & item (en catalog) ─────"
-CID=$(curl -s $CAT/categories/ | jq '.[] | select(.name=="Herramientas") | .id')
-if [[ -z $CID ]]; then
-  CID=$(auth -X POST $CAT/categories/ -H 'Content-Type: application/json' \
-        -d '{"name":"Herramientas"}' | jq -r .id)
-fi
-ITEM=$(auth -X POST $CAT/items/ -H 'Content-Type: application/json' -d @- <<EOF
-{
-  "name":"Taladro Bosch",
-  "description":"800 W",
-  "price_per_h":4.5,
-  "categories":[$CID],
-  "image_urls":["https://picsum.photos/seed/taladro/800/600"]
-}
-EOF
-)
-IID=$(echo "$ITEM" | jq -r .id)
-echo "item_id = $IID"
-
-echo "──── 4) crear alquiler ─────"
-RENT=$(auth -X POST $REN/ -H 'Content-Type: application/json' -d @- <<EOF
-{
-  "item_id": $IID,
-  "start_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "end_at":   "$(date -u -d '+2 hour' +"%Y-%m-%dT%H:%M:%SZ")"
-}
-EOF
-) && echo "$RENT" | j
-RID=$(echo "$RENT" | jq -r .id)
-
-echo "──── 5) mis alquileres ─────"
-auth $REN/me | j
-
-echo "──── 6) devolución ─────"
-auth -X POST $REN/$RID/return | j
-
-
---- services/rentals/migrations/script.py.mako ---
-
-
---- services/rentals/migrations/README ---
-
-
---- services/rentals/migrations/env.py ---
-"""Alembic env – Rentals"""
-from __future__ import annotations
-
-from logging.config import fileConfig
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-config = context.config
-fileConfig(config.config_file_name)
-
-from app.models.models import Base                # noqa: E402
-target_metadata = Base.metadata
-target_metadata.naming_convention = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s",
-}
-
-from app.core.config import settings             # noqa: E402
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-
-def run_offline() -> None:
-    context.configure(
-        url=settings.DATABASE_URL,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-        compare_type=True,
-        compare_server_default=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as conn:
-        context.configure(
-            connection=conn,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_offline()
-else:
-    run_online()
-
-
---- services/rentals/migrations/versions/20250714_0001_initial.py ---
-"""Inicial – tabla rentals
-
-Revision ID: 20250714_0001
-Revises:
-Create Date: 2025‑07‑14 00:15:00
-"""
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
-# ─────────── Meta ───────────
-revision: str = "20250714_0001"
-down_revision: str | None = None
-branch_labels: tuple | None = None
-depends_on: tuple | None = None
-
-
-# ─────────── Upgrade ────────
-def upgrade() -> None:
-    rental_status = postgresql.ENUM(
-        "pending", "confirmed", "returned",
-        name="rental_status",
-    )
-    rental_status.create(op.get_bind(), checkfirst=True)
-
-    op.create_table(
-        "rentals",
-        sa.Column("id", sa.Integer(), primary_key=True),
-
-        sa.Column("item_id", sa.Integer(), index=True, nullable=False),
-        sa.Column("renter_username", sa.String(), index=True, nullable=False),
-
-        sa.Column("start_at", sa.DateTime(), nullable=False),
-        sa.Column("end_at",   sa.DateTime(), nullable=False),
-
-        sa.Column("deposit", sa.Float(), nullable=False),
-
-        sa.Column(
-            "status",
-            postgresql.ENUM(
-                "pending", "confirmed", "returned",
-                name="rental_status",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="pending",
-        ),
-
-        sa.Column(
-            "returned",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.false(),
-        ),
-    )
-
-
-# ─────────── Downgrade ──────
-def downgrade() -> None:
-    op.drop_table("rentals")
-
-    rental_status = postgresql.ENUM(name="rental_status")
-    rental_status.drop(op.get_bind(), checkfirst=True)
-
-
---- services/rentals/migrations/versions/.gitkeep ---
-
-
---- services/rentals/app/main.py ---
-# services/rentals/app/main.py
-from fastapi import FastAPI
-
-from app.api import rentals
-
-app = FastAPI(
-    title="rental-mvp – Rentals Service",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-# La BD se gestiona exclusivamente con Alembic;
-# no ejecutamos create_all() para evitar conflictos.
-# (Si lo prefieres, elimina por completo este fichero on_event)
-#
-# from app.models.database import Base, engine
-# @app.on_event("startup")
-# def _init_db() -> None:
-#     Base.metadata.create_all(bind=engine)
-
-app.include_router(rentals.router, prefix="/api/rentals", tags=["rentals"])
-
-
---- services/rentals/app/__init__.py ---
-
-
---- services/rentals/app/deps.py ---
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from sqlalchemy.orm import Session
-
-from app.models.database import SessionLocal
-from app.core.config import settings
-
-# ───────── DB
-def get_db() -> Session:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ───────── JWT – solo extraemos el username
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dummy")
-
-
-def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales no válidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        sub: str | None = payload.get("sub")
-        if not sub:
-            raise cred_exc
-        return sub
-    except JWTError:
-        raise cred_exc
-
-
---- services/rentals/app/models/models.py ---
-# services/rentals/app/models/models.py
-from __future__ import annotations
-
-import datetime
-import enum
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    Integer,
-    String,
-)
-from sqlalchemy.dialects import postgresql
-
-from app.models.database import Base
-
-
-class RentalStatus(str, enum.Enum):
-    pending   = "pending"
-    confirmed = "confirmed"
-    returned  = "returned"
-
-
-class Rental(Base):
-    __tablename__ = "rentals"
-
-    id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, nullable=False, index=True)
-    renter_username = Column(String, nullable=False, index=True)
-
-    start_at = Column(DateTime, default=datetime.datetime.utcnow)
-    end_at   = Column(DateTime)
-
-    deposit = Column(Float, nullable=False)
-
-    status = Column(
-        postgresql.ENUM(
-            RentalStatus,
-            name="rental_status",
-            create_type=False          # ← usa el TYPE ya existente
-        ),
-        default=RentalStatus.pending,
-        nullable=False,
-    )
-    returned = Column(Boolean, default=False)
-
-
---- services/rentals/app/models/__init__.py ---
-
-
---- services/rentals/app/models/database.py ---
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-from app.core.config import settings
-
-engine = create_engine(settings.DATABASE_URL, echo=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-
---- services/rentals/app/schemas/rental.py ---
-from __future__ import annotations
-
-from datetime import datetime
-from pydantic import BaseModel, field_validator, PositiveFloat
-from typing import Literal
-
-class RentalCreate(BaseModel):
-    item_id: int
-    start_at: datetime
-    end_at: datetime
-
-    @field_validator("end_at")
-    @classmethod
-    def end_must_be_after_start(cls, v: datetime, info):
-        start = info.data["start_at"]
-        if v <= start:
-            raise ValueError("end_at debe ser posterior a start_at")
-        return v
-
-
-# 🛈 “ItemSnapshot” es la versión mínima que necesita el front
-class ItemSnapshot(BaseModel):
-    id: int
-    name: str
-    price_per_h: PositiveFloat
-    image_url: str | None = None
-    image_urls: list[str] | None = None
-    available: bool | None = None
-
-
-class RentalOut(RentalCreate):
-    id: int
-    deposit: float
-    status: Literal["pending", "confirmed", "returned"]
-    renter_username: str
-    item: ItemSnapshot
-
-
---- services/rentals/app/schemas/__init__.py ---
-from .rental import RentalCreate, RentalOut
-__all__ = ["RentalCreate", "RentalOut"]
-
-
---- services/rentals/app/crud/rental.py ---
-from __future__ import annotations
-
-import math
-from decimal import Decimal, ROUND_HALF_UP
-from typing import List
-
-import httpx
-from sqlalchemy.orm import Session
-
-from app.models.models import Rental, RentalStatus          # ← enum importado
-from app.schemas.rental import RentalCreate
-from app.core.config import settings
-
-
-# ───────── helpers internos ───────────────────────────────────────────────
-async def _fetch_item(item_id: int) -> dict:
-    """
-    Llama al micro‑servicio **Catalog** para obtener el ítem.
-    Lanza HTTPError si no existe / 404.
-    """
-    url = f"{settings.CATALOG_API_BASE}/items/{item_id}"
-    async with httpx.AsyncClient() as client:
-        r = await client.get(url, timeout=5.0)
-        r.raise_for_status()
-        return r.json()
-
-
-def _calc_deposit(hours: float, price: float) -> float:
-    """
-    Depósito = 120 % del coste estimado (redondeo a 2 decimales).
-    """
-    raw = Decimal(hours * price * 1.2)
-    return float(raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
-
-
-# ───────── CRUD público ───────────────────────────────────────────────────
-async def create_rental(
-    db: Session,
-    renter_username: str,
-    rent_in: RentalCreate,
-) -> Rental:
-    item = await _fetch_item(rent_in.item_id)            # -- HTTP → Catalog
-
-    if not item["available"]:
-        raise ValueError("Ítem no disponible")
-
-    hours = (rent_in.end_at - rent_in.start_at).total_seconds() / 3600
-    deposit = _calc_deposit(hours, item["price_per_h"])
-
-    db_rental = Rental(
-        renter_username=renter_username,
-        deposit=deposit,
-        status=RentalStatus.pending,                     # ← nuevo
-        returned=False,                                  # compatibilidad
-        **rent_in.model_dump(),
-    )
-    db.add(db_rental)
-    db.commit()
-    db.refresh(db_rental)
-    return db_rental
-
-
-def get_rental(db: Session, rental_id: int) -> Rental | None:
-    return db.query(Rental).filter(Rental.id == rental_id).first()
-
-
-def get_rentals_by_user(db: Session, username: str) -> List[Rental]:
-    return db.query(Rental).filter(Rental.renter_username == username).all()
-
-
-def mark_returned(db: Session, rental: Rental) -> Rental:
-    rental.returned = True
-    rental.status = RentalStatus.returned                # ← sincroniza estado
-    db.commit()
-    db.refresh(rental)
-    return rental
-
-
---- services/rentals/app/crud/__init__.py ---
-from .rental import (
-    create_rental,
-    get_rental,
-    get_rentals_by_user,
-    mark_returned,
-)
-__all__ = [
-    "create_rental",
-    "get_rental",
-    "get_rentals_by_user",
-    "mark_returned",
-]
-
-
---- services/rentals/app/core/__init__.py ---
-
-
---- services/rentals/app/core/config.py ---
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    DATABASE_URL: str
-    SECRET_KEY: str
-    CATALOG_API_BASE: str           # p. ej. http://catalog:8000/api
-    ALGORITHM: str = "HS256"
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-
-settings = Settings()
-
-
---- services/rentals/app/core/security.py ---
-
-
---- services/rentals/app/api/rentals.py ---
-from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
-from app import crud, schemas
-from app.deps import get_db, get_current_username
-
-router = APIRouter()
-
-
-# ────────────── crear alquiler ────────────────────────────────────────────
-@router.post(
-    "/",
-    response_model=schemas.RentalOut,
-    status_code=status.HTTP_201_CREATED,
-)
-async def rent_item(
-    rent_in: schemas.RentalCreate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    try:
-        rental = await crud.create_rental(db, username, rent_in)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    return await _with_item(rental)
-
-
-# ────────────── lista del usuario ─────────────────────────────────────────
-@router.get("/me", response_model=List[schemas.RentalOut])
-async def my_rentals(
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    rentals = crud.get_rentals_by_user(db, username)
-    return [await _with_item(r) for r in rentals]
-
-
-# ────────────── devolución ────────────────────────────────────────────────
-@router.post("/{rental_id}/return", response_model=schemas.RentalOut)
-async def return_item(
-    rental_id: int,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    rental = crud.get_rental(db, rental_id)
-    if not rental or rental.renter_username != username:
-        raise HTTPException(404, "Alquiler no encontrado")
-    rental = crud.mark_returned(db, rental)
-    return await _with_item(rental)
-
-
-# ────────────── helper común ──────────────────────────────────────────────
-import httpx
-from app.core.config import settings
-from app.schemas.rental import ItemSnapshot
-
-
-async def _with_item(rental) -> schemas.RentalOut:
-    """
-    Añade el snapshot del item a la salida para que el front no
-    necesite hacer otra llamada.
-    """
-    url = f"{settings.CATALOG_API_BASE}/items/{rental.item_id}"
-    async with httpx.AsyncClient() as client:
-        item_json = {}
-        try:
-            r = await client.get(url, timeout=5.0)
-            if r.status_code == 200:
-                item_json = r.json()
-        except httpx.HTTPError:
-            pass
-
-    return schemas.RentalOut(
-        **rental.__dict__,
-        item=ItemSnapshot(**item_json) if item_json else ItemSnapshot(
-            id=rental.item_id,
-            name="Desconocido",
-            price_per_h=0,
-        ),
-    )
-
-
---- services/rentals/app/api/__init__.py ---
-
-
---- services/upload/requirements.txt ---
-fastapi==0.116.0
-uvicorn==0.35.0
-python-multipart==0.0.6
-python-jose[cryptography]==3.5.0
-pydantic-settings==2.10.1
-
-
---- services/upload/.env ---
-SECRET_KEY=SuperClaveUltraSecreta
-ALGORITHM=HS256
-
---- services/upload/test_upload.sh ---
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
-# ───────── Endpoints ────────────────────────────────────────────────────
-AUTH=http://localhost:8001/api/auth
-UPLD=http://localhost:8004/api/upload
-
-USER=alice
-MAIL=alice@example.com
-PASS=secret
-
-# ───────── Imagen a subir ───────────────────────────────────────────────
-# 1º argumento o, si no, intenta localizar una cualquiera en el repo
-if [[ $# -ge 1 ]]; then
-  IMG_PATH=$1
-else
-  # busca la primera .png|.jpg dentro de backend/uploads/ (dummy data del monolito)
-  IMG_PATH=$(find ../../backend/uploads -type f -regex '.*\.\(png\|jpe?g\)$' | head -n 1 || true)
-  [[ -z $IMG_PATH ]] && { echo "❌ No se encontró ninguna imagen de ejemplo. Pasa la ruta como argumento."; exit 1; }
-fi
-echo "Usando imagen: $IMG_PATH"
-
-j() { jq -C .; }                      # pretty-json helper
-auth() { curl -s "$@" "${HDR[@]}"; }  # wrapper con token
-
-# ───── 1) signup (ignora error si existe) ───────────────────────────────
-echo "──── 1) signup ────"
-curl -s -X POST $AUTH/signup \
-     -H 'Content-Type: application/json' \
-     -d "{\"username\":\"$USER\",\"email\":\"$MAIL\",\"password\":\"$PASS\"}" \
-  | j || echo "(ya existe)"
-
-# ───── 2) login ────────────────────────────────────────────────────────
-echo "──── 2) login ─────"
-TOKEN=$(curl -s -X POST $AUTH/token \
-              -H 'Content-Type: application/x-www-form-urlencoded' \
-              -d "username=$USER&password=$PASS" | jq -r .access_token)
-HDR=(-H "Authorization: Bearer $TOKEN")
-echo "JWT: $TOKEN"
-
-# ───── 3) upload ───────────────────────────────────────────────────────
-echo "──── 3) subir imagen ─────"
-RESP=$(curl -s "${HDR[@]}" -F "file=@${IMG_PATH}" "$UPLD/")
-echo "$RESP" | j
-URL=$(echo "$RESP" | jq -r .url)
-
-# ───── 4) HEAD de la URL pública ───────────────────────────────────────
-echo "──── 4) HEAD $URL ─────"
-curl -I "$URL" | sed 's/^/   /'
-echo -e "\n✔️  Debe ser 200 OK y content-type image/*"
-
-
---- services/upload/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# código
-COPY app/          ./app
-COPY .env          .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
---- services/upload/app/main.py ---
-from fastapi import FastAPI
-from app.api import router as api_router
-from app.api.upload import mount_static     # reutilizamos la helper
-
-app = FastAPI(title="Upload-Service")
-
-# Rutas de API (quedarán bajo /api)
-app.include_router(api_router, prefix="/api")
-
-# Ficheros estáticos (imágenes subidas)
-mount_static(app)
-
-
---- services/upload/app/__init__.py ---
-
-
---- services/upload/app/deps.py ---
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-
-from app.core.config import settings
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dummy")   # solo validamos
-
-def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales no válidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        sub: str | None = payload.get("sub")
-        if not sub:
-            raise cred_exc
-        return sub
-    except JWTError:
-        raise cred_exc
-
-
---- services/upload/app/core/__init__.py ---
-
-
---- services/upload/app/core/config.py ---
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-class Settings(BaseSettings):
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-settings = Settings()
-
-
---- services/upload/app/api/__init__.py ---
-from fastapi import APIRouter
-from .upload import router as upload_router
-
-router = APIRouter()
-router.include_router(upload_router)          # ⇒ /api/upload/…
-
-
---- services/upload/app/api/upload.py ---
-# services/upload/app/api/upload.py
-"""
-Endpoint privado para subir imágenes y exponerlas luego en /uploads/…
-Devuelve **SIEMPRE** la ruta relativa “/uploads/<uuid>.<ext>” para que el
-frontend la combine con su propio dominio (evitamos el host interno “upload”).
-"""
-from __future__ import annotations
-
-import os
-import shutil
-import uuid
-from pathlib import Path
-from typing import Annotated
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    HTTPException,
-    Request,
-    UploadFile,
-    status,
-)
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from jose import JWTError, jwt
-
-# ────────────────────────────────────────────────────────────────────────────
-# Configuración global
-# ────────────────────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-# La clave/algoritmo deben ser los mismos que usa el auth-service
-JWT_SECRET = os.getenv("SECRET_KEY", "SuperClaveUltraSecreta")
-JWT_ALGORITHM = os.getenv("ALGORITHM", "HS256")
-
-# ────────────────────────────────────────────────────────────────────────────
-# Seguridad (Bearer JWT)
-# ────────────────────────────────────────────────────────────────────────────
-security = HTTPBearer()
-
-
-def get_current_username(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
-) -> str:
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        username: str | None = payload.get("sub")
-        if not username:
-            raise ValueError
-        return username
-    except (JWTError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token JWT inválido",
-        )
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Router
-# ────────────────────────────────────────────────────────────────────────────
-router = APIRouter(prefix="/upload", tags=["upload"])
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def upload_image(
-    request: Request,
-    file: UploadFile = File(...),
-    _user: str = Depends(get_current_username),  # protegido con JWT
-):
-    # 1) validar tipo mime
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Solo se permiten imágenes")
-
-    # 2) generar nombre único y guardar
-    ext = Path(file.filename).suffix
-    filename = f"{uuid.uuid4()}{ext}"
-    filepath = UPLOAD_DIR / filename
-    try:
-        with filepath.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    finally:
-        file.file.close()
-
-    # 3) ruta pública **relativa**
-    return {"filename": filename, "url": f"/uploads/{filename}"}
-
-
-# ────────────────────────────────────────────────────────────────────────────
-# Montaje estático (/uploads)  →  se llama desde app.main
-# ────────────────────────────────────────────────────────────────────────────
-def mount_static(app):
-    app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-
---- services/payments/requirements.txt ---
-fastapi==0.116.0
-uvicorn==0.35.0
-stripe==9.5.0               # SDK oficial
-python-multipart==0.0.6
-pydantic-settings==2.10.1
-
-
---- services/payments/.env ---
-# payments/.env  (test mode)
-STRIPE_SECRET_KEY=sk_test_51RkNe1BAdmER2zaJGyKPFTWV3a3mJ5MtgUhLsyoH4NIYDRDGm8thv6dnOYyUNIqgngTMSk34IY6QkfhTu6wY8Hv300yTE5xy67
-STRIPE_PUBLISHABLE_KEY=pk_test_51RkNe1BAdmER2zaJNEdcxq6T7uBwtyGDiHaFRF5I9LjGGbbYxmvPfdffr4HLqZy753gB6ixJRFfu7HXRsntuCGyH00szhzRTcx
-STRIPE_WEBHOOK_SECRET=whsec_d42657ee524a1103317e68c4b982a8706ba436ffc37124d5ea797eb08535b52e
-
-FRONTEND_URL=http://15.188.100.106
-ALLOWED_ORIGINS=http://15.188.100.106
-DOMAIN=http://15.188.100.106
-
-
-
---- services/payments/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app          
-
-# dependencias
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# ----------  ¡aquí estaba el problema!  ----------
-# copia el *directorio*  app/  ⇒  /app/app/   ✅
-COPY app/ ./app
-# -----------------------------------------------
-
-COPY .env .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
---- services/payments/alembic.ini ---
-[alembic]
-script_location = %(here)s/migrations
-sqlalchemy.url = %(DATABASE_URL)s
-prepend_sys_path = .
-
-[loggers]
-keys = root,alembic,sqlalchemy
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-[logger_root]
-level = WARNING
-handlers = console
-
-[logger_alembic]
-level = INFO
-handlers = console
-qualname = alembic
-
-[logger_sqlalchemy]
-level = WARNING
-handlers = console
-qualname = sqlalchemy.engine
-
-[handler_console]
-class = StreamHandler
-args = (sys.stderr,)
-level = NOTSET
-formatter = generic
-
-[formatter_generic]
-format = %(levelname)-7s %(name)s: %(message)s
-
-
---- services/payments/migrations/script.py.mako ---
-
-
---- services/payments/migrations/env.py ---
-
-
---- services/payments/app/main.py ---
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from app.core.config import settings
-from app.api import router as api_router
-
-app = FastAPI(title="Payments-Service")
-
-# CORS (frontend local)
-origins = (settings.ALLOWED_ORIGINS or "").split(",")
-if origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_methods=["POST"],
-        allow_headers=["*"],
-    )
-
-app.include_router(api_router, prefix="/api")
-
-
---- services/payments/app/__init__.py ---
-
-
---- services/payments/app/deps.py ---
-import stripe
-from fastapi import Header, HTTPException
-
-from app.core.config import settings
-
-stripe.api_key = settings.secret_key
-
-
-def get_stripe():
-    """Devuelve el cliente Stripe configurado (inyección de dependencias)."""
-    return stripe
-
-
-def verify_webhook(
-    stripe_signature: str | None = Header(None, alias="Stripe-Signature"),
-    payload: bytes | None = None,
-):
-    """
-    Verifica la firma del webhook usando la secret generada con
-    `stripe listen`.  Lanza 400 si la firma es inválida.
-    """
-    if payload is None:
-        raise HTTPException(status_code=400, detail="body empty")
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload=payload,
-            sig_header=stripe_signature,
-            secret=settings.STRIPE_WEBHOOK_SECRET,
-        )
-        return event
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="invalid signature")
-
-
---- services/payments/app/models/payment.py ---
-from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from app.models.database import Base
-
-class Payment(Base):
-    __tablename__ = "payments"
-
-    id = Column(Integer, primary_key=True)
-    rental_id = Column(Integer, nullable=False)            # id proveniente del microservicio rentals
-    user_id   = Column(Integer, nullable=False)            # quién paga (renter)
-    owner_id  = Column(Integer, nullable=False)            # propietario del ítem (cobra)
-    amount    = Column(Float, nullable=False)              # € totales
-    currency  = Column(String(3), default="eur")
-    stripe_pi = Column(String, nullable=False, unique=True)  # PaymentIntent id
-    refunded  = Column(Boolean, default=False)
-    captured  = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
---- services/payments/app/models/__init__.py ---
-from .payment import Payment  # noqa: F401
-
-
---- services/payments/app/models/database.py ---
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import settings
-
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-Base = declarative_base()
-
-
---- services/payments/app/schemas/payment.py ---
-# services/payments/app/schemas/payment.py
-from datetime import datetime
-from pydantic import BaseModel, PositiveFloat, ConfigDict
-
-
-class PaymentCreate(BaseModel):
-    rental_id: int
-    owner_id: int            # propietario (Stripe Connect)
-    amount: PositiveFloat
-    currency: str = "eur"
-
-
-class PaymentOut(BaseModel):
-    id: int
-    rental_id: int
-    amount: float
-    currency: str
-    captured: bool
-    refunded: bool
-    stripe_pi: str
-    created_at: datetime
-
-    # Pydantic v2
-    model_config = ConfigDict(from_attributes=True)
-
-
---- services/payments/app/schemas/__init__.py ---
-from .payment import PaymentCreate, PaymentOut
-
-__all__ = ["PaymentCreate", "PaymentOut"]
-
-
---- services/payments/app/crud/payment.py ---
-from sqlalchemy.orm import Session
-from app.models.payment import Payment
-from app.schemas.payment import PaymentCreate
-
-def create(db: Session, payment_in: PaymentCreate, stripe_pi: str) -> Payment:
-    p = Payment(**payment_in.model_dump(), stripe_pi=stripe_pi)
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return p
-
-def get_by_pi(db: Session, stripe_pi: str) -> Payment | None:
-    return db.query(Payment).filter(Payment.stripe_pi == stripe_pi).first()
-
-def capture(db: Session, payment: Payment) -> Payment:
-    payment.captured = True
-    db.commit()
-    db.refresh(payment)
-    return payment
-
-def refund(db: Session, payment: Payment) -> Payment:
-    payment.refunded = True
-    db.commit()
-    db.refresh(payment)
-    return payment
-
-
---- services/payments/app/crud/__init__.py ---
-from .payment import create as create_payment, get_by_pi, capture, refund  # noqa: F401
-
-__all__ = ["create_payment", "get_by_pi", "capture", "refund"]
-
-
---- services/payments/app/workers/settlement.py ---
-"""
-Ejemplo de *cron worker* (Celery, RQ, etc.) que captura pagos
-una vez confirmado que el ítem se ha devuelto.
-"""
-from sqlalchemy.orm import Session
-import stripe, time
-from app.models.database import SessionLocal
-from app import crud
-from app.core.config import settings
-
-def run_forever():
-    while True:
-        with SessionLocal() as db:          # type: Session
-            pending = db.query(crud.get_by_pi.__annotations__["return"]).filter_by(
-                captured=False, refunded=False
-            )
-            for p in pending:
-                # Aquí llamarías al API del microservicio rentals para ver si returned = true
-                # demo: asumimos que sí tras 2 h
-                try:
-                    stripe.PaymentIntent.capture(p.stripe_pi)
-                    crud.capture(db, p)
-                except Exception as e:  # noqa: BLE001
-                    print("No se pudo capturar:", e)
-
-        time.sleep(600)  # cada 10 min
-
-if __name__ == "__main__":
-    run_forever()
-
-
---- services/payments/app/workers/__init__.py ---
-
-
---- services/payments/app/core/__init__.py ---
-import stripe
-from app.core.config import settings
-
-stripe.api_key = settings.secret_key
-
-
---- services/payments/app/core/config.py ---
-from functools import cached_property
-from pydantic_settings import BaseSettings
-
-
-class Settings(BaseSettings):
-    # ───── Stripe ──────────────────────────────────────────────────────────
-    STRIPE_SECRET_KEY: str | None = None       # nombre habitual
-    STRIPE_API_KEY:    str | None = None       # alias heredado
-    STRIPE_PUBLISHABLE_KEY: str
-    STRIPE_WEBHOOK_SECRET:  str
-
-    # ───── Servicio ───────────────────────────────────────────────────────
-    PLATFORM_FEE_PERCENT: int = 8              # comisión % de la plataforma
-    DOMAIN: str = "http://localhost:8005"
-
-    # ───── CORS ───────────────────────────────────────────────────────────
-    ALLOWED_ORIGINS: str = ""                  # lista separada por comas
-
-    # ───── BD (opcional) ─────────────────────────────────────────────────
-    DATABASE_URL: str | None = None
-
-    # lee .env y omite claves extra
-    model_config = {"env_file": ".env", "extra": "ignore"}
-
-    # ──────────────────────────────────────────────────────────────────────
-    #  Acceso unificado a la clave secreta
-    # ──────────────────────────────────────────────────────────────────────
-    @cached_property
-    def secret_key(self) -> str:
-        """
-        Devuelve la clave secreta de Stripe sin importar el nombre de la
-        variable.  STRIPE_SECRET_KEY tiene prioridad sobre STRIPE_API_KEY.
-        """
-        key = self.STRIPE_SECRET_KEY or self.STRIPE_API_KEY
-        if not key:
-            raise RuntimeError(
-                "Debes definir STRIPE_SECRET_KEY o STRIPE_API_KEY en el entorno"
-            )
-        return key
-
-
-settings = Settings()
-
-
---- services/payments/app/core/stripe.py ---
-"""
-Pequeña capa de ayuda sobre el SDK oficial de Stripe.
-"""
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Literal
-
-import stripe
-
-from app.core.config import settings
-
-stripe.api_key = settings.secret_key
-
-Currency = Literal["eur", "usd"]
-
-
-def _percentage(amount: int, pct: int) -> int:
-    """
-    Devuelve `pct` % de `amount` redondeado al céntimo.
-    Ambos valores en céntimos (enteros).
-    """
-    return int(
-        (Decimal(amount) * Decimal(pct) / Decimal(100)).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
-
-
-def calc_app_fee(amount_cents: int) -> int:
-    """Comisión de la plataforma en **céntimos**."""
-    return _percentage(amount_cents, settings.PLATFORM_FEE_PERCENT)
-
-
-def create_payment_intent(
-    amount_cents: int,
-    currency: Currency,
-    customer_id: str | None,
-    connected_account: str,
-) -> stripe.PaymentIntent:
-    """
-    Crea un PaymentIntent *manual-capture* para un vendedor de Stripe Connect,
-    reteniendo la comisión de la plataforma.
-    """
-    return stripe.PaymentIntent.create(
-        amount=amount_cents,
-        currency=currency,
-        payment_method_types=["card"],
-        customer=customer_id,
-        capture_method="manual",
-        application_fee_amount=calc_app_fee(amount_cents),
-        on_behalf_of=connected_account,
-        transfer_data={"destination": connected_account},
-    )
-
-
---- services/payments/app/api/payments.py ---
-"""
-Endpoints
----------
-• POST /api/payments/create-intent   -> Frontend
-• POST /api/stripe/webhook           -> Stripe
-"""
-from typing import Literal
-
-import stripe
-from fastapi import APIRouter, Header, HTTPException, Request
-from pydantic import BaseModel, PositiveFloat
-
-from app.core.config import settings
-
-stripe.api_key = settings.secret_key
-
-router = APIRouter()
-
-# ───── Schemas ────────────────────────────────────────────────────────────
-class CreateIntentIn(BaseModel):
-    amount: PositiveFloat             # € que cobra el propietario
-
-
-class CreateIntentOut(BaseModel):
-    client_secret: str
-
-
-EUR_FACTOR: Literal[100] = 100        # euros → céntimos
-
-# ───── Endpoints ──────────────────────────────────────────────────────────
-@router.post("/create-intent", response_model=CreateIntentOut)
-def create_payment_intent(data: CreateIntentIn):
-    """Devuelve el *client_secret* para que el Front confirme el pago."""
-    intent = stripe.PaymentIntent.create(
-        amount=int(data.amount * EUR_FACTOR),
-        currency="eur",
-        automatic_payment_methods={"enabled": True},
-    )
-    return {"client_secret": intent.client_secret}
-
-
-@router.post("/stripe/webhook", status_code=200)
-async def stripe_webhook(
-    request: Request,
-    stripe_signature: str = Header(None, alias="Stripe-Signature"),
-):
-    """
-    Recibe eventos de Stripe, verifica la firma y despacha los handlers
-    necesarios.  Siempre respondemos 2xx para que Stripe marque correcta
-    la entrega.
-    """
-    payload = await request.body()
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload=payload,
-            sig_header=stripe_signature,
-            secret=settings.STRIPE_WEBHOOK_SECRET,
-        )
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="invalid signature")
-
-    if event["type"] == "payment_intent.succeeded":
-        _handle_success(event["data"]["object"])
-    elif event["type"] == "payment_intent.payment_failed":
-        _handle_failure(event["data"]["object"])
-
-    return {"received": True}
-
-
-# ───── Internal handlers ─────────────────────────────────────────────────
-def _handle_success(pi: dict):
-    # Aquí actualizarías tu BD, enviaría emails, etc.
-    print("✅ PaymentIntent succeeded:", pi["id"])
-
-
-def _handle_failure(pi: dict):
-    print("❌ PaymentIntent failed:", pi["id"])
-
-
---- services/payments/app/api/webhooks.py ---
-"""
-Recibe eventos de Stripe (webhook) y sincroniza estado interno.
-"""
-import stripe
-from fastapi import APIRouter, Header, HTTPException, Request, Depends, status
-from sqlalchemy.orm import Session
-
-from app.core.config import settings
-from app import crud
-from app.deps import get_db
-
-router = APIRouter()
-
-@router.post("/stripe")
-async def stripe_webhook(
-    request: Request,
-    stripe_signature: str = Header(None, alias="Stripe-Signature"),
-    db: Session = Depends(get_db),
-):
-    payload = await request.body()
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Firma inválida")
-
-    if event.type == "payment_intent.succeeded":
-        pi = event.data.object
-        p = crud.get_by_pi(db, pi["id"])
-        if p and not p.captured:
-            crud.capture(db, p)
-
-    elif event.type == "charge.refunded":
-        ch = event.data.object
-        pi_id = ch["payment_intent"]
-        p = crud.get_by_pi(db, pi_id)
-        if p and not p.refunded:
-            crud.refund(db, p)
-
-    return {"received": True}
-
-
---- services/payments/app/api/__init__.py ---
-from fastapi import APIRouter
-from .payments import router as payments_router
-
-router = APIRouter()
-router.include_router(payments_router, prefix="/payments", tags=["payments"])
-
-# NOTA: el webhook *no* lleva prefix /api, se monta tal cual en payments.py
-
-
---- services/catalog/requirements.txt ---
-
-fastapi==0.116.0
-uvicorn==0.35.0
-pydantic==2.11.7
-pydantic-core==2.33.2
-pydantic-settings==2.10.1
-SQLAlchemy==2.0.41
-python-jose[cryptography]==3.5.0
-python-multipart==0.0.6
-python-dotenv==1.1.1
-alembic==1.16.4
-email-validator==2.1.1     # (pydantic extra)
-uvloop==0.21.0
-httptools==0.6.4
-psycopg2-binary==2.9.9 
-
---- services/catalog/.env ---
-
-DATABASE_URL=postgresql+psycopg2://catalog_user:catalog_pass@catalog-db:5432/catalog
-SECRET_KEY=SuperClaveUltraSecreta
-
-
---- services/catalog/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libffi-dev build-essential libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# código + alembic + env
-COPY app/         ./app
-COPY alembic.ini  .
-COPY migrations/  ./migrations
-COPY .env         .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
---- services/catalog/test_endpoints.sh ---
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
-AUTH=http://localhost:8001/api/auth
-CAT=http://localhost:8002/api
-USERNAME=demo; EMAIL=demo@example.com; PASSWORD=demo
-
-j() { jq -C .; }            # pretty-json coloreado
-auth() { curl -s "$@" "${AUTHZ[@]}"; }
-
-echo "────────── 1) SIGN-UP ──────────"
-curl -s -X POST "$AUTH/signup" \
-     -H 'Content-Type: application/json' \
-     -d "{\"username\":\"$USERNAME\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
-  | j || echo "(usuario ya existe)"
-
-echo "────────── 2) LOGIN ────────────"
-TOKEN=$(curl -s -X POST "$AUTH/token" \
-              -H 'Content-Type: application/x-www-form-urlencoded' \
-              -d "username=$USERNAME&password=$PASSWORD" \
-        | jq -r .access_token)
-AUTHZ=(-H "Authorization: Bearer $TOKEN")
-echo "JWT => $TOKEN"
-
-echo "────────── 3) /me ──────────────"
-# Detecta cuál de los dos paths expone el servicio
-for ME in "$AUTH/me" "$AUTH/users/me"; do
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' "$ME" "${AUTHZ[@]}")
-  [[ $CODE == 200 ]] && { curl -s "$ME" "${AUTHZ[@]}" | j; break; }
-done
-
-echo "────────── 4) CATEGORIES ───────"
-declare -A CIDs
-for NAME in "Herramientas" "Decoración"; do
-  # ¿existe ya?
-  CID=$(curl -s "$CAT/categories/" | jq ".[] | select(.name==\"$NAME\") | .id")
-  if [[ -z $CID ]]; then
-     CID=$(curl -s -X POST "$CAT/categories/" "${AUTHZ[@]}" \
-                 -H 'Content-Type: application/json' \
-                 -d "{\"name\":\"$NAME\"}" | jq -r .id)
-  fi
-  CIDs[$NAME]=$CID
-  echo "• $NAME id=${CID}"
-done
-
-echo "────────── 5) ITEMS CRUD ───────"
-DATA='{
-  "name":"Taladro Bosch",
-  "description":"800 W",
-  "price_per_h":4.5,
-  "image_urls":["https://picsum.photos/seed/taladro/800/600"]
-}'
-# Sólo enviamos categories si tenemos IDs válidos
-[[ -n ${CIDs[Herramientas]} ]] && \
-  DATA=$(jq --argjson cid ${CIDs[Herramientas]} '. + {categories:[$cid]}' <<<"$DATA")
-
-ITEM=$(curl -s -X POST "$CAT/items/" "${AUTHZ[@]}" \
-            -H 'Content-Type: application/json' \
-            -d "$DATA")
-echo "$ITEM" | j
-IID=$(echo "$ITEM" | jq -r .id)
-
-echo "── GET públicos /items?available=true"
-curl -s "$CAT/items?available=true" | j
-
-echo "── GET privados  /items/me"
-auth "$CAT/items/me" | j
-
-echo "── PATCH /items/$IID (añade Decoración, cambia precio)"
-PATCH=$(jq --argjson cid ${CIDs[Decoración]} '{price_per_h:5.0,categories:[$cid]}' <<<"{}")
-auth -X PATCH "$CAT/items/$IID" \
-     -H 'Content-Type: application/json' \
-     -d "$PATCH" | j
-
-echo "── DELETE /items/$IID"
-auth -X DELETE "$CAT/items/$IID" -w '\n(status %{http_code})\n'
-
-echo "── /items/me debería estar vacío"
-auth "$CAT/items/me" | j
-
-echo "────────── 6) UPLOAD ───────────"
-if [[ -f sample.jpg ]]; then
-  auth -X POST "$CAT/upload/" -F "file=@sample.jpg" | j
-else
-  echo "(sin sample.jpg; omitiendo)"
-fi
-
-echo -e "\n✅  tests completados"
-
-
---- services/catalog/alembic.ini ---
-[alembic]
-script_location = migrations
-prepend_sys_path = .
-sqlalchemy.url = postgresql+psycopg2://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-
-version_path_separator = os
-
-
-# ────────────── Logging ──────────────
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-
-[logger_root]
-level    = WARN
-handlers = console
-
-
-[logger_sqlalchemy]
-level     = WARN
-qualname  = sqlalchemy.engine
-handlers  = console
-
-
-[logger_alembic]
-level     = INFO
-qualname  = alembic
-handlers  = console
-
-
-[handler_console]
-class     = StreamHandler
-args      = (sys.stderr,)
-formatter = generic
-
-
-[formatter_generic]
-format   = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt  = %H:%M:%S
-
-
---- services/catalog/migrations/script.py.mako ---
-
-"""${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-"""
-from alembic import op
-import sqlalchemy as sa
-${imports if imports else ""}
-
-revision = ${repr(up_revision)}
-down_revision = ${repr(down_revision)}
-branch_labels = ${repr(branch_labels)}
-depends_on = ${repr(depends_on)}
-
-
-def upgrade():
-    ${upgrades if upgrades else "pass"}
-
-
-def downgrade():
-    ${downgrades if downgrades else "pass"}
-
-
---- services/catalog/migrations/README ---
-
-
---- services/catalog/migrations/env.py ---
-
-"""Alembic environment for Catalog service."""
-from __future__ import annotations
-
-from logging.config import fileConfig
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-# ─── configuración ────────────────────────────────────────────────────────
-config = context.config
-fileConfig(config.config_file_name)
-
-# Metadata
-from app.models.models import Base                                   # noqa: E402
-target_metadata = Base.metadata
-target_metadata.naming_convention = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s",
-}
-
-# URL de la BD → .env
-from app.core.config import settings                                # noqa: E402
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-
-
-def run_migrations_offline() -> None:
-    context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-        compare_type=True,
-        compare_server_default=True,
-    )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-
-
---- services/catalog/migrations/versions/20250714_0002_seed_default_categories.py ---
-"""Seed default categories
-
-Revision ID: 20250714_0002
-Revises: 20250713_0001
-Create Date: 2025‑07‑14 12:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-
-revision = "20250714_0002"
-down_revision = "20250713_0001"
-branch_labels = None
-depends_on = None
-
-DEFAULT_CATEGORIES = [
-    "Herramientas",
-    "Electrónica",
-    "Deportes",
-    "Hogar",
-    "Jardín",
-    "Fotografía",
-    "Camping",
-    "Infantil",
-]
-
-
-def upgrade() -> None:
-    categories = sa.table("categories", sa.column("name", sa.String))
-    conn = op.get_bind()
-
-    existing = {row.name for row in conn.execute(sa.select(categories.c.name))}
-    to_insert = [{"name": n} for n in DEFAULT_CATEGORIES if n not in existing]
-
-    if to_insert:
-        op.bulk_insert(categories, to_insert)
-
-
-def downgrade() -> None:
-    op.execute(
-        sa.text("DELETE FROM categories WHERE name = ANY(:names)"),
-        {"names": DEFAULT_CATEGORIES},
-    )
-
-
---- services/catalog/migrations/versions/20250713_0001_initial.py ---
-"""Initial schema
-
-Revision ID: 20250713_0001
-Revises:
-Create Date: 2025‑07‑13 12:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-
-# ──────────────────────────────
-revision = "20250713_0001"
-down_revision = None
-branch_labels = None
-depends_on = None
-# ──────────────────────────────
-
-def upgrade() -> None:
-    op.create_table(
-        "categories",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("name", sa.String, nullable=False, unique=True, index=True),
-    )
-
-    op.create_table(
-        "items",
-        sa.Column("id", sa.Integer, primary_key=True, index=True),
-        sa.Column("name", sa.String, nullable=False, index=True),
-        sa.Column("description", sa.String),
-        sa.Column("price_per_h", sa.Float, nullable=False),
-        sa.Column("image_url", sa.String),
-        sa.Column("owner_username", sa.String, nullable=False, index=True),
-        sa.Column("available", sa.Boolean, server_default=sa.text("true"), nullable=False),
-    )
-
-    op.create_table(
-        "item_images",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("item_id", sa.Integer, sa.ForeignKey("items.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("url", sa.String, nullable=False),
-    )
-
-    op.create_table(
-        "item_categories",
-        sa.Column("item_id", sa.Integer, sa.ForeignKey("items.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("category_id", sa.Integer, sa.ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True),
-    )
-
-
-def downgrade() -> None:
-    op.drop_table("item_categories")
-    op.drop_table("item_images")
-    op.drop_table("items")
-    op.drop_table("categories")
-
-
---- services/catalog/app/main.py ---
-# services/catalog/app/main.py
-from fastapi import FastAPI
-
-from app.api import categories, items
-from app.models.database import Base, engine
-import app.models.models                         #  noqa: F401
-
-app = FastAPI(
-    title="rental-mvp – Catalog Service",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-@app.on_event("startup")
-def _init_db() -> None:
-    Base.metadata.create_all(bind=engine)
-
-app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
-app.include_router(items.router,      prefix="/api/items",      tags=["items"])
-
-
---- services/catalog/app/__init__.py ---
-
-
---- services/catalog/app/deps.py ---
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from sqlalchemy.orm import Session
-
-from app.models.database import SessionLocal
-from app.core.config import settings
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dummy")  # no lo usamos, solo valida header
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
-    """Devuelve `sub` del JWT emitido por Auth."""
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales no válidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str | None = payload.get("sub")
-        if not username:
-            raise cred_exc
-        return username
-    except JWTError:
-        raise cred_exc
-
---- services/catalog/app/models/models.py ---
-from __future__ import annotations
-
-from typing import List
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Table,
-)
-from sqlalchemy.orm import relationship
-
-from .database import Base
-
-# relación N:M items–categories
-item_categories = Table(
-    "item_categories",
-    Base.metadata,
-    Column("item_id", Integer, ForeignKey("items.id", ondelete="CASCADE"), primary_key=True),
-    Column("category_id", Integer, ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True),
-)
-
-class ItemImage(Base):
-    __tablename__ = "item_images"
-
-    id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
-    url = Column(String, nullable=False)
-
-    item = relationship("Item", back_populates="images")
-
-
-class Category(Base):
-    __tablename__ = "categories"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, index=True, nullable=False)
-
-    items = relationship("Item", secondary=item_categories, back_populates="categories")
-
-
-class Item(Base):
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True, nullable=False)
-    description = Column(String)
-    price_per_h = Column(Float, nullable=False)
-
-    # destacado (legacy)
-    image_url = Column(String)
-
-    # ← vínculo al propietario (micro-servicio auth)
-    owner_username = Column(String, index=True, nullable=False)
-
-    available = Column(Boolean, default=True)
-
-    # relaciones
-    categories = relationship("Category", secondary=item_categories, back_populates="items")
-    images = relationship(
-        "ItemImage",
-        back_populates="item",
-        cascade="all, delete-orphan",
-        order_by="ItemImage.id",
-    )
-
-    # helper
-    @property
-    def image_urls(self) -> List[str]:
-        return [img.url for img in self.images]
-
---- services/catalog/app/models/__init__.py ---
-# importa modelos para que Alembic los detecte
-from .models import Category, Item, ItemImage  # noqa: F401
-
---- services/catalog/app/models/database.py ---
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-from app.core.config import settings
-
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, echo=True)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
---- services/catalog/app/schemas/category.py ---
-from pydantic import BaseModel, Field
-
-
-class CategoryBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=50)
-
-
-class CategoryCreate(CategoryBase):
-    pass
-
-
-class CategoryOut(CategoryBase):
-    id: int
-
-    class Config:
-        from_attributes = True
-
---- services/catalog/app/schemas/__init__.py ---
-from .category import CategoryCreate, CategoryOut
-from .item import ItemCreate, ItemUpdate, ItemOut
-
-__all__ = [
-    "CategoryCreate",
-    "CategoryOut",
-    "ItemCreate",
-    "ItemUpdate",
-    "ItemOut",
-]
-
---- services/catalog/app/schemas/item.py ---
-# services/catalog/app/schemas/item.py
-from __future__ import annotations
-
-from typing import List, Optional
-
-from pydantic import (
-    BaseModel,
-    Field,
-    PositiveFloat,
-    AfterValidator,      # 🆕 validador ligero en v2
-)
-from typing_extensions import Annotated   # Annotated en 3.12
-
-from .category import CategoryOut
-
-
-# ────────────────────────────────────────────────────────────────────
-#  Tipo URL “relajado” → admite http(s)://…  o  rutas relativas “/…”
-# ────────────────────────────────────────────────────────────────────
-def _check_url(v: str) -> str:
-    if v.startswith(("http://", "https://", "/")):
-        return v
-    raise ValueError("url debe ser http(s)://… o empezar por /uploads/…")
-
-
-UrlStr = Annotated[str, AfterValidator(_check_url)]
-
-
-# ─────────────────────────── SCHEMAS ────────────────────────────────
-class ItemBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=80)
-    description: Optional[str] = None
-    price_per_h: PositiveFloat
-
-
-class ItemCreate(ItemBase):
-    image_urls: List[UrlStr] = Field(..., min_length=1, max_length=6)
-    categories: Optional[List[int]] = Field(
-        default=None, description="IDs de categorías asociadas"
-    )
-
-
-class ItemUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=80)
-    description: Optional[str] = None
-    price_per_h: Optional[PositiveFloat] = None
-    image_urls: Optional[List[UrlStr]] = Field(None, min_length=1, max_length=6)
-    categories: Optional[List[int]] = None
-
-    model_config = {"extra": "forbid"}
-
-
-class ItemOut(ItemBase):
-    id: int
-    available: bool
-    owner_username: str
-    categories: List[CategoryOut]
-    image_urls: List[UrlStr]
-    image_url: Optional[UrlStr] = None  # compat con versiones antiguas
-
-    model_config = {"from_attributes": True}
-
-
---- services/catalog/app/crud/category.py ---
-from typing import List, Optional
-
-from sqlalchemy.orm import Session
-
-from app.models.models import Category
-from app.schemas.category import CategoryCreate
-
-
-def get_category(db: Session, cat_id: int) -> Optional[Category]:
-    return db.query(Category).filter(Category.id == cat_id).first()
-
-
-def get_categories(db: Session) -> List[Category]:
-    return db.query(Category).order_by(Category.name).all()
-
-
-def create_category(db: Session, cat_in: CategoryCreate) -> Category:
-    db_cat = Category(**cat_in.model_dump())
-    db.add(db_cat)
-    db.commit()
-    db.refresh(db_cat)
-    return db_cat
-
---- services/catalog/app/crud/__init__.py ---
-from .category import get_category, get_categories, create_category           # noqa: F401
-from .item import (                                                           # noqa: F401
-    get_item,
-    get_items,
-    get_items_by_owner,
-    create_item,
-    update_item,
-    delete_item,
-)
-
-__all__ = [
-    "get_category",
-    "get_categories",
-    "create_category",
-    "get_item",
-    "get_items",
-    "get_items_by_owner",
-    "create_item",
-    "update_item",
-    "delete_item",
-]
-
---- services/catalog/app/crud/item.py ---
-from __future__ import annotations
-
-from typing import List, Optional, Tuple
-
-from sqlalchemy import asc, desc, or_
-from sqlalchemy.orm import Session, joinedload
-
-from app.models.models import Category, Item, ItemImage
-from app.schemas.item import ItemCreate, ItemUpdate
-
-# ───────── helpers internos ───────────────────────────────────────────────
-def _get_categories_or_400(db: Session, ids: list[int]) -> list[Category]:
-    cats = db.query(Category).filter(Category.id.in_(ids)).all()
-    if len(cats) != len(ids):
-        missing = set(ids) - {c.id for c in cats}
-        raise ValueError(f"Categorías inexistentes: {', '.join(map(str, missing))}")
-    return cats
-
-
-def _apply_order(q, order_by: str | None, order_dir: str | None):
-    mapping = {"price": Item.price_per_h, "name": Item.name, "id": Item.id}
-    if not order_by:
-        return q.order_by(Item.id)
-    col = mapping.get(order_by, Item.id)
-    return q.order_by(asc(col) if order_dir == "asc" else desc(col))
-
-
-# ───────── lectura ────────────────────────────────────────────────────────
-def get_item(db: Session, item_id: int) -> Optional[Item]:
-    return (
-        db.query(Item)
-        .options(joinedload(Item.categories), joinedload(Item.images))
-        .filter(Item.id == item_id)
-        .first()
-    )
-
-
-def _build_query(
-    db: Session,
-    *,
-    name: Optional[str],
-    min_price: Optional[float],
-    max_price: Optional[float],
-    available: Optional[bool],
-    categories: Optional[List[int]],
-    order_by: Optional[str],
-    order_dir: Optional[str],
-):
-    q = db.query(Item).options(joinedload(Item.categories), joinedload(Item.images))
-
-    if name:
-        pattern = f"%{name}%"
-        q = q.filter(or_(Item.name.ilike(pattern), Item.description.ilike(pattern)))
-    if min_price is not None:
-        q = q.filter(Item.price_per_h >= min_price)
-    if max_price is not None:
-        q = q.filter(Item.price_per_h <= max_price)
-    if available is not None:
-        q = q.filter(Item.available == available)
-    if categories:
-        q = q.filter(Item.categories.any(Category.id.in_(categories)))
-
-    return _apply_order(q, order_by, order_dir)
-
-
-def get_items(
-    db: Session,
-    skip: int,
-    limit: int,
-    *,
-    name: Optional[str],
-    min_price: Optional[float],
-    max_price: Optional[float],
-    available: Optional[bool],
-    categories: Optional[List[int]],
-    order_by: Optional[str],
-    order_dir: Optional[str],
-) -> Tuple[List[Item], int]:
-    q = _build_query(
-        db,
-        name=name,
-        min_price=min_price,
-        max_price=max_price,
-        available=available,
-        categories=categories,
-        order_by=order_by,
-        order_dir=order_dir,
-    )
-    total = q.count()
-    items = q.offset(skip).limit(limit).all()
-    return items, total
-
-
-def get_items_by_owner(db: Session, owner: str) -> List[Item]:
-    return (
-        db.query(Item)
-        .options(joinedload(Item.categories), joinedload(Item.images))
-        .filter(Item.owner_username == owner)
-        .all()
-    )
-
-
-# ───────── escritura ──────────────────────────────────────────────────────
-def create_item(db: Session, item_in: ItemCreate, owner_username: str) -> Item:
-    main = str(item_in.image_urls[0])
-
-    db_item = Item(
-        name=item_in.name,
-        description=item_in.description,
-        price_per_h=item_in.price_per_h,
-        image_url=main,
-        owner_username=owner_username,
-    )
-
-    if item_in.categories:
-        db_item.categories = _get_categories_or_400(db, item_in.categories)
-
-    db_item.images = [ItemImage(url=str(u)) for u in item_in.image_urls]
-
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-
-def update_item(db: Session, db_item: Item, item_in: ItemUpdate) -> Item:
-    data = item_in.model_dump(exclude_unset=True, exclude={"categories", "image_urls"})
-    for k, v in data.items():
-        setattr(db_item, k, v)
-
-    if item_in.categories is not None:
-        db_item.categories = _get_categories_or_400(db, item_in.categories)
-
-    if item_in.image_urls is not None:
-        db_item.image_url = str(item_in.image_urls[0])
-        db_item.images = [ItemImage(url=str(u)) for u in item_in.image_urls]
-
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-
-def delete_item(db: Session, db_item: Item) -> None:
-    db.delete(db_item)
-    db.commit()
-
---- services/catalog/app/core/__init__.py ---
-
-
---- services/catalog/app/core/config.py ---
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    DATABASE_URL: str
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-
-settings = Settings()
-
---- services/catalog/app/api/items.py ---
-from typing import List, Optional
-from urllib.parse import urlencode
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    Response,
-    status,
-)
-from sqlalchemy.orm import Session
-
-from app import crud, schemas
-from app.deps import get_db, get_current_username
-
-router = APIRouter()
-
-# ───────── helpers paginación RFC-5988 ────────────────────────────────────
-def _pagination_links(request: Request, skip: int, limit: int, total: int, **flt):
-    links: list[str] = []
-    base = request.url.remove_query_params("skip").remove_query_params("limit")
-
-    def _url(new_skip: int):
-        params = {k: v for k, v in flt.items() if v is not None}
-        params.update({"skip": new_skip, "limit": limit})
-        return f"<{base}?{urlencode(params, doseq=True)}>"
-
-    if skip + limit < total:
-        links.append(f'{_url(skip + limit)}; rel="next"')
-    if skip > 0:
-        links.append(f'{_url(max(skip - limit,0))}; rel="prev"')
-    return ", ".join(links)
-
-
-# ───────────── crear ─────────────────────────────────────────────────────
-@router.post("/", response_model=schemas.ItemOut, status_code=status.HTTP_201_CREATED)
-def create_item(
-    item_in: schemas.ItemCreate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    return crud.create_item(db, item_in, owner_username=username)
-
-
-# ───────────── listar público ────────────────────────────────────────────
-@router.get("/", response_model=List[schemas.ItemOut])
-def list_items(
-    request: Request,
-    response: Response,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    name: Optional[str] = None,
-    min_price: Optional[float] = Query(None, ge=0),
-    max_price: Optional[float] = Query(None, ge=0),
-    available: Optional[bool] = None,
-    categories: Optional[List[int]] = Query(None),
-    order_by: Optional[str] = Query(None, pattern="^(price|name|id)$"),
-    order_dir: Optional[str] = Query(None, pattern="^(asc|desc)$"),
-    db: Session = Depends(get_db),
-):
-    items, total = crud.get_items(
-        db,
-        skip,
-        limit,
-        name=name,
-        min_price=min_price,
-        max_price=max_price,
-        available=available,
-        categories=categories,
-        order_by=order_by,
-        order_dir=order_dir,
-    )
-    response.headers["X-Total-Count"] = str(total)
-    if total:
-        link = _pagination_links(
-            request,
-            skip,
-            limit,
-            total,
-            name=name,
-            min_price=min_price,
-            max_price=max_price,
-            available=available,
-            categories=categories,
-            order_by=order_by,
-            order_dir=order_dir,
-        )
-        if link:
-            response.headers["Link"] = link
-    return items
-
-
-# ───────────── mis ítems ────────────────────────────────────────────────
-@router.get("/me", response_model=List[schemas.ItemOut])
-def my_items(
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    return crud.get_items_by_owner(db, username)
-
-
-# ───────────── actualizar ───────────────────────────────────────────────
-@router.patch("/{item_id}", response_model=schemas.ItemOut)
-def patch_item(
-    item_id: int,
-    item_in: schemas.ItemUpdate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    return crud.update_item(db, db_item, item_in)
-
-
-@router.put("/{item_id}", response_model=schemas.ItemOut)
-def put_item(
-    item_id: int,
-    item_in: schemas.ItemCreate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    return crud.update_item(db, db_item, schemas.ItemUpdate(**item_in.model_dump()))
-
-# ───────────── obtener 1 ítem ────────────────────────────────────────────
-@router.get("/{item_id}", response_model=schemas.ItemOut)
-def get_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Devuelve un único ítem por *ID*.
-
-    404 si no existe.
-    """
-    db_item = crud.get_item(db, item_id)
-    if not db_item:
-        raise HTTPException(404, "Item no encontrado")
-    return db_item
-
-
-
-# ───────────── eliminar ────────────────────────────────────────────────
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    crud.delete_item(db, db_item)
-
---- services/catalog/app/api/categories.py ---
-from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
-from app import crud, schemas
-from app.deps import get_db, get_current_username
-
-router = APIRouter()
-
-
-@router.get("/", response_model=List[schemas.CategoryOut])
-def list_categories(db: Session = Depends(get_db)):
-    return crud.get_categories(db)
-
-
-@router.post(
-    "/", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED
-)
-def create_category(
-    cat_in: schemas.CategoryCreate,
-    db: Session = Depends(get_db),
-    _user=Depends(get_current_username),        # solo autenticados
-):
-    return crud.create_category(db, cat_in)
-
-
-@router.get("/{cat_id}", response_model=schemas.CategoryOut)
-def get_category(cat_id: int, db: Session = Depends(get_db)):
-    cat = crud.get_category(db, cat_id)
-    if not cat:
-        raise HTTPException(404, "Categoría no encontrada")
-    return cat
-
---- services/catalog/app/api/__init__.py ---
-
-
---- services/catalog/app/api/upload.py ---
-# services/catalog/app/api/upload.py
-"""
-Endpoint para subir imágenes desde el catálogo.
-También devuelve la **ruta relativa** /uploads/…  para evitar problemas de host.
-"""
-from __future__ import annotations
-
-import os
-import shutil
-import uuid
-from pathlib import Path
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Request,
-    UploadFile,
-    status,
-)
-
-from app.deps import get_current_username
-
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-router = APIRouter()
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def upload_image(
-    file: UploadFile,
-    request: Request,
-    _user=Depends(get_current_username),
-):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Solo imágenes")
-
-    ext = Path(file.filename).suffix
-    name = f"{uuid.uuid4()}{ext}"
-    path = UPLOAD_DIR / name
-
-    with path.open("wb") as buf:
-        shutil.copyfileobj(file.file, buf)
-
-    # ← ruta relativa
-    return {"url": f"/uploads/{name}"}
 
 

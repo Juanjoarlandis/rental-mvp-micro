@@ -1,7 +1,7 @@
 import stripe
 from fastapi import Header, HTTPException
 
-from app.core.config import settings
+from core.config import settings  # FIX: Quita 'app.'
 
 stripe.api_key = settings.secret_key
 

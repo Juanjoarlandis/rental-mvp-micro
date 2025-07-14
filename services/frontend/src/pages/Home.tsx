@@ -1,6 +1,4 @@
-/* -------------------------------------------------------------------------- */
-/*  src/pages/Home.tsx                                                        */
-/* -------------------------------------------------------------------------- */
+/* src/pages/Home.tsx */
 import { Link } from 'react-router-dom';
 import {
   ArrowRightIcon,
@@ -8,7 +6,12 @@ import {
   CloudArrowUpIcon,
   CalendarDaysIcon,
   BanknotesIcon,
+  ShieldCheckIcon,  // NEW: Para benefits
+  UsersIcon,        // NEW
+  GlobeAltIcon,     // NEW
 } from '@heroicons/react/24/solid';
+import { useEffect, useRef } from 'react';  // NEW: Para animaciones
+import clsx from 'clsx';
 
 import Container from '../components/shared/Container';
 import Section from '../components/shared/Section';
@@ -18,36 +21,94 @@ import LogoCloud from '../components/Home/LogoCloud';
 import Testimonials from '../components/Home/Testimonials';
 import FAQ from '../components/Home/FAQ';
 
-export default function Home() {
-  /* Pasos del “cómo funciona” con su icono */
-  const STEPS = [
-    {
-      title: 'Publica',
-      desc: 'Sube tu producto, ponle precio y límites de uso.',
-      icon: CloudArrowUpIcon,
-    },
-    {
-      title: 'Reserva',
-      desc: 'Los usuarios pagan la fianza y reservan al instante.',
-      icon: CalendarDaysIcon,
-    },
-    {
-      title: 'Gana',
-      desc: 'Entregas el ítem, recibes el pago y valoraciones ⭐',
-      icon: BanknotesIcon,
-    },
+// NEW: Sección Benefits
+const Benefits = () => {
+  const BENEFITS = [
+    { icon: ShieldCheckIcon, title: 'Seguro y confiable', desc: 'Pagos protegidos con Stripe y verificación de usuarios.' },
+    { icon: UsersIcon, title: 'Comunidad local', desc: 'Conecta con vecinos y reduce huella ecológica.' },
+    { icon: GlobeAltIcon, title: 'Fácil de usar', desc: 'Publica en minutos, reserva al instante.' },
   ];
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+    Array.from(el.querySelectorAll('.fade-in')).forEach(child => io.observe(child));
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Section title="Beneficios">
+      <Container>
+        <div ref={ref} className="grid gap-8 md:grid-cols-3">
+          {BENEFITS.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="fade-in text-center space-y-2 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">
+              <Icon className="mx-auto h-12 w-12 text-brand" />
+              <h3 className="text-xl font-semibold">{title}</h3>
+              <p className="text-gray-600">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </Container>
+    </Section>
+  );
+};
+
+const STEPS = [  // Updated: Cards con shadows
+  {
+    title: 'Publica',
+    desc: 'Sube tu producto, ponle precio y límites de uso.',
+    icon: CloudArrowUpIcon,
+  },
+  {
+    title: 'Reserva',
+    desc: 'Los usuarios pagan la fianza y reservan al instante.',
+    icon: CalendarDaysIcon,
+  },
+  {
+    title: 'Gana',
+    desc: 'Entregas el ítem, recibes el pago y valoraciones ⭐',
+    icon: BanknotesIcon,
+  },
+];
+
+export default function Home() {
+  const stepsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {  // Animación para steps
+    const el = stepsRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          Array.from(e.target.children).forEach((child, i) => {
+            child.classList.add('visible');
+            (child as HTMLElement).style.transitionDelay = `${i * 0.2}s`;
+          });
+        }
+      });
+    }, { threshold: 0.2 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   return (
     <>
-      {/* ---------- HERO ---------- */}
-      <section className="relative isolate overflow-hidden bg-brand text-white">
-        {/* background blur blob */}
-        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
+      {/* ---------- HERO (mejorado: gradient bg, animación fade-in) ---------- */}
+      <section className="relative isolate overflow-hidden bg-gradient-to-br from-brand to-brand-hover text-white py-32">  {/* +gradient */}
+        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl animate-pulse" />  {/* +animate-pulse */}
 
         <Container>
-          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center">
-            <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight">
+          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center fade-in visible">  {/* +fade-in */}
+            <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight md:text-6xl">  {/* +md:text-6xl */}
               Dónde tus cosas <br className="hidden sm:inline" />
               <span className="text-white/80">cambian de mano</span>
             </h1>
@@ -69,7 +130,7 @@ export default function Home() {
           </div>
         </Container>
 
-        {/* wave separator */}
+        {/* wave separator (más suave) */}
         <svg
           aria-hidden
           viewBox="0 0 1440 120"
@@ -83,18 +144,21 @@ export default function Home() {
         </svg>
       </section>
 
-      {/* ---------- STATS ---------- */}
+      {/* ---------- STATS (ya animado) ---------- */}
       <Stats />
 
-      {/* ---------- LOGO CLOUD ---------- */}
+      {/* ---------- LOGO CLOUD (con hover) ---------- */}
       <LogoCloud />
 
-      {/* ---------- CÓMO FUNCIONA ---------- */}
+      {/* ---------- BENEFITS (nueva sección) ---------- */}
+      <Benefits />
+
+      {/* ---------- CÓMO FUNCIONA (cards con animaciones secuenciales) ---------- */}
       <Section title="¿Cómo funciona?">
         <Container>
-          <div className="grid gap-12 md:grid-cols-3">
+          <div ref={stepsRef} className="grid gap-12 md:grid-cols-3">
             {STEPS.map(({ title, desc, icon: Icon }) => (
-              <div key={title} className="space-y-4 text-center">
+              <div key={title} className="fade-in text-center space-y-4 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">  {/* +cards */}
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
                   <Icon className="h-6 w-6 text-brand" />
                 </div>
@@ -106,20 +170,20 @@ export default function Home() {
         </Container>
       </Section>
 
-      {/* ---------- TESTIMONIOS ---------- */}
+      {/* ---------- TESTIMONIALS (mejorado: grid responsivo) ---------- */}
       <Testimonials />
 
-      {/* ---------- FAQ ---------- */}
+      {/* ---------- FAQ (con iconos y transiciones) ---------- */}
       <FAQ />
 
-      {/* ---------- CTA FINAL ---------- */}
-      <section className="bg-brand py-16 text-center text-white">
+      {/* ---------- CTA FINAL (con animación) ---------- */}
+      <section className="bg-brand py-16 text-center text-white fade-in">
         <Container>
           <h2 className="mb-6 text-3xl font-bold">
             ¿Listo para estrenar ingresos extra?
           </h2>
-          <Link to="/register" className="btn">
-            Crear cuenta gratis
+          <Link to="/register" className="btn inline-flex gap-2">
+            Crear cuenta gratis <ArrowRightIcon className="h-5 w-5" />
           </Link>
         </Container>
       </section>

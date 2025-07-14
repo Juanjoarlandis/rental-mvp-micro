@@ -1,16 +1,11 @@
-"""
-Endpoints
----------
-• POST /api/payments/create-intent   -> Frontend
-• POST /api/stripe/webhook           -> Stripe
-"""
 from typing import Literal
 
 import stripe
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request  # FIX: Añade Request aquí
 from pydantic import BaseModel, PositiveFloat
 
-from app.core.config import settings
+from core.config import settings
+from core.ratelimit import limiter
 
 stripe.api_key = settings.secret_key
 
@@ -29,7 +24,8 @@ EUR_FACTOR: Literal[100] = 100        # euros → céntimos
 
 # ───── Endpoints ──────────────────────────────────────────────────────────
 @router.post("/create-intent", response_model=CreateIntentOut)
-def create_payment_intent(data: CreateIntentIn):
+@limiter.limit("3/minute")  # Rate limit auditado y aplicado (3/min por IP)
+def create_payment_intent(data: CreateIntentIn, request: Request):  # FIX: Añade ', request: Request'
     """Devuelve el *client_secret* para que el Front confirme el pago."""
     intent = stripe.PaymentIntent.create(
         amount=int(data.amount * EUR_FACTOR),

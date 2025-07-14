@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    FRONTEND_URL: str | None = None  # MODIFIED: Optional
     DATABASE_URL: str
     SECRET_KEY: str
     CATALOG_API_BASE: str           # p. ej. http://catalog:8000/api

@@ -32,6 +32,7 @@ def get_current_user(
     Valida el JWT y devuelve el usuario asociado.
     Lanza 401 si es inválido o no existe.
     """
+    # MODIFIED: Mejora - Añadido manejo de expiración y scopes si aplica
     cred_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Credenciales no válidas",
@@ -43,8 +44,9 @@ def get_current_user(
         username: str | None = payload.get("sub")
         if not username:
             raise cred_exc
-    except JWTError:
-        raise cred_exc
+    except JWTError as e:  # MODIFIED: Más granular (expirado, inválido)
+        detail = "Token expirado" if "exp" in str(e) else "Token inválido"
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail)
 
     user = crud.get_user_by_username(db, username)
     if not user:

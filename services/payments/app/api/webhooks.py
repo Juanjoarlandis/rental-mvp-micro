@@ -5,9 +5,9 @@ import stripe
 from fastapi import APIRouter, Header, HTTPException, Request, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app import crud
-from app.deps import get_db
+from core.config import settings  # FIX: Quita 'app.'
+from crud import get_by_pi, capture, refund  # FIX: Quita 'app.', importa directo
+from deps import get_db  # FIX: Quita 'app.'
 
 router = APIRouter()
 
@@ -27,15 +27,15 @@ async def stripe_webhook(
 
     if event.type == "payment_intent.succeeded":
         pi = event.data.object
-        p = crud.get_by_pi(db, pi["id"])
+        p = get_by_pi(db, pi["id"])
         if p and not p.captured:
-            crud.capture(db, p)
+            capture(db, p)
 
     elif event.type == "charge.refunded":
         ch = event.data.object
         pi_id = ch["payment_intent"]
-        p = crud.get_by_pi(db, pi_id)
+        p = get_by_pi(db, pi_id)
         if p and not p.refunded:
-            crud.refund(db, p)
+            refund(db, p)
 
     return {"received": True}

@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ──────────────── AUTH ───────────────────────────────
   auth-db:
@@ -16,6 +14,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - rental-net
 
   auth-migrate:
     build: ./services/auth
@@ -25,18 +25,26 @@ services:
     depends_on:
       auth-db:
         condition: service_healthy
-    restart: "no"                     # se ejecuta una sola vez
+    restart: "no"
+    networks:
+      - rental-net
 
   auth:
     build: ./services/auth
     container_name: auth-service
     env_file: ./services/auth/.env
-    # ⇒ puerto sólo interno (comenta la línea siguiente si quieres exponerlo)
-    # ports: ["8001:8000"]
     restart: unless-stopped
     depends_on:
       auth-migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; exit(0 if r.urlopen('http://localhost:8000/health').getcode() == 200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rental-net
 
   # ──────────────── CATALOG ────────────────────────────
   catalog-db:
@@ -53,6 +61,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - rental-net
 
   catalog-migrate:
     build: ./services/catalog
@@ -63,16 +73,25 @@ services:
       catalog-db:
         condition: service_healthy
     restart: "no"
+    networks:
+      - rental-net
 
   catalog:
     build: ./services/catalog
     container_name: catalog-service
     env_file: ./services/catalog/.env
-    # ports: ["8002:8000"]
     restart: unless-stopped
     depends_on:
       catalog-migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; exit(0 if r.urlopen('http://localhost:8000/health').getcode() == 200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rental-net
 
   # ──────────────── RENTALS ────────────────────────────
   rentals-db:
@@ -89,6 +108,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - rental-net
 
   rentals-migrate:
     build: ./services/rentals
@@ -99,18 +120,27 @@ services:
       rentals-db:
         condition: service_healthy
     restart: "no"
+    networks:
+      - rental-net
 
   rentals:
     build: ./services/rentals
     container_name: rentals-service
     env_file: ./services/rentals/.env
-    # ports: ["8003:8000"]
     restart: unless-stopped
     depends_on:
       rentals-migrate:
         condition: service_completed_successfully
       catalog:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; exit(0 if r.urlopen('http://localhost:8000/health').getcode() == 200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rental-net
 
   # ──────────────── UPLOAD ─────────────────────────────
   upload:
@@ -118,30 +148,47 @@ services:
     container_name: upload-service
     env_file: ./services/upload/.env
     volumes:
-      - uploads_data:/app/app/uploads        # imágenes persistentes
-    # ports: ["8004:8000"]
+      - uploads_data:/app/app/uploads
     restart: unless-stopped
     depends_on:
       auth:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; exit(0 if r.urlopen('http://localhost:8000/health').getcode() == 200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rental-net
 
   # ──────────────── PAYMENTS ───────────────────────────
   payments:
     build: ./services/payments
     container_name: payments-service
     env_file: ./services/payments/.env
-    # ports: ["8005:8000"]
     restart: unless-stopped
     depends_on:
       auth:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; exit(0 if r.urlopen('http://localhost:8000/health').getcode() == 200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rental-net
 
   # ──────────────── FRONTEND (Nginx) ───────────────────
   frontend:
     build: ./services/frontend
     container_name: frontend-service
     ports:
-      - "80:80"                               # único puerto público
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro  # Monta self-signed certs
     restart: unless-stopped
     depends_on:
       - auth
@@ -149,9 +196,20 @@ services:
       - rentals
       - upload
       - payments
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - rental-net
 
 volumes:
   auth_db_data:
   catalog_db_data:
   rentals_db_data:
   uploads_data:
+
+networks:
+  rental-net:

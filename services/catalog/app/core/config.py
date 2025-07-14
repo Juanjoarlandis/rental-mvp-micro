@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    FRONTEND_URL: str | None = None  # MODIFIED: Optional
     DATABASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str = "HS256"

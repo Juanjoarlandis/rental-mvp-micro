@@ -6,9 +6,10 @@ from typing import List
 
 import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
-from app.models.models import Rental, RentalStatus          # ← enum importado
-from app.schemas.rental import RentalCreate
+from app.models.models import Rental, RentalStatus
+from app.schemas.rental import RentalCreate, DateRange  # ### UPDATED: Import DateRange
 from app.core.config import settings
 
 
@@ -33,6 +34,16 @@ def _calc_deposit(hours: float, price: float) -> float:
     return float(raw.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+# ───────── ### NEW: Rangos ocupados para calendario ───────────────────────
+def get_occupied_ranges(db: Session, item_id: int) -> List[DateRange]:
+    rentals = (
+        db.query(Rental)
+        .filter(Rental.item_id == item_id, Rental.status != RentalStatus.returned)
+        .all()
+    )
+    return [DateRange(start_at=r.start_at, end_at=r.end_at) for r in rentals]
+
+
 # ───────── CRUD público ───────────────────────────────────────────────────
 async def create_rental(
     db: Session,
@@ -44,14 +55,30 @@ async def create_rental(
     if not item["available"]:
         raise ValueError("Ítem no disponible")
 
+    # ### NEW: Chequeo de overlap para manejar múltiples usuarios
+    overlap = (
+        db.query(Rental)
+        .filter(
+            Rental.item_id == rent_in.item_id,
+            Rental.status != RentalStatus.returned,
+            or_(
+                Rental.start_at < rent_in.end_at,
+                Rental.end_at > rent_in.start_at,
+            ),
+        )
+        .count()
+    )
+    if overlap > 0:
+        raise ValueError("El rango seleccionado no está disponible (conflicto con otra reserva)")
+
     hours = (rent_in.end_at - rent_in.start_at).total_seconds() / 3600
     deposit = _calc_deposit(hours, item["price_per_h"])
 
     db_rental = Rental(
         renter_username=renter_username,
         deposit=deposit,
-        status=RentalStatus.pending,                     # ← nuevo
-        returned=False,                                  # compatibilidad
+        status=RentalStatus.pending,
+        returned=False,
         **rent_in.model_dump(),
     )
     db.add(db_rental)
@@ -70,7 +97,7 @@ def get_rentals_by_user(db: Session, username: str) -> List[Rental]:
 
 def mark_returned(db: Session, rental: Rental) -> Rental:
     rental.returned = True
-    rental.status = RentalStatus.returned                # ← sincroniza estado
+    rental.status = RentalStatus.returned
     db.commit()
     db.refresh(rental)
     return rental

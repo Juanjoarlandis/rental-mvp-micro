@@ -1,3 +1,4 @@
+/* src/components/Home/Testimonials.tsx */
 import Container from '../shared/Container';
 
 const TESTIMONIALS = [
@@ -20,16 +21,15 @@ const TESTIMONIALS = [
 
 export default function Testimonials() {
   return (
-    <SectionWrapper>
+    <section className="bg-white py-16">
       <Container>
         <h2 className="mb-10 text-center text-3xl font-bold">Historias reales</h2>
 
-        {/* slider */}
-        <div className="flex snap-x gap-6 overflow-x-auto pb-4 sm:justify-center">
+        <div className="grid gap-6 md:grid-cols-3">  {/* NEW: Grid en lugar de scroll */}
           {TESTIMONIALS.map(t => (
             <article
               key={t.name}
-              className="snap-center shrink-0 rounded-xl bg-white p-6 shadow-card sm:w-80"
+              className="rounded-xl bg-white p-6 shadow-card transition-shadow hover:shadow-md"
             >
               <div className="flex items-center gap-3">
                 <img
@@ -45,10 +45,6 @@ export default function Testimonials() {
           ))}
         </div>
       </Container>
-    </SectionWrapper>
+    </section>
   );
-}
-
-function SectionWrapper({ children }: { children: React.ReactNode }) {
-  return <section className="bg-white py-16">{children}</section>;
 }
