@@ -742,7 +742,8 @@ export default defineConfig({
 
 --- services/frontend/.env ---
 VITE_STRIPE_PK=pk_test_51RkNe1BAdmER2zaJNEdcxq6T7uBwtyGDiHaFRF5I9LjGGbbYxmvPfdffr4HLqZy753gB6ixJRFfu7HXRsntuCGyH00szhzRTcx
-VITE_API_BASE=http://15.188.100.106:8002
+
+
 
 --- services/frontend/Dockerfile ---
 # ───────────── Etapa 1: build Vite ─────────────
@@ -771,20 +772,17 @@ CMD ["nginx", "-g", "daemon off;"]
 --- services/frontend/nginx.conf ---
 server {
     listen 80;
-    server_name 15.188.100.106;
-
-
+    server_name 15.188.100.106;          
     # --------- estáticos Vite ---------
     root /usr/share/nginx/html;
     index index.html;
     client_max_body_size 100M;
 
     location / {
-        # Single-Page-App → fallback al index.html
         try_files $uri $uri/ /index.html;
     }
 
-    # --------- proxy API (micro-servicios) ---------
+    # --------- proxy API ---------
     location /api/auth/       { proxy_pass http://auth:8000; }
     location /api/items/      { proxy_pass http://catalog:8000; }
     location /api/categories/ { proxy_pass http://catalog:8000; }
@@ -4813,8 +4811,10 @@ STRIPE_SECRET_KEY=sk_test_51RkNe1BAdmER2zaJGyKPFTWV3a3mJ5MtgUhLsyoH4NIYDRDGm8thv
 STRIPE_PUBLISHABLE_KEY=pk_test_51RkNe1BAdmER2zaJNEdcxq6T7uBwtyGDiHaFRF5I9LjGGbbYxmvPfdffr4HLqZy753gB6ixJRFfu7HXRsntuCGyH00szhzRTcx
 STRIPE_WEBHOOK_SECRET=whsec_d42657ee524a1103317e68c4b982a8706ba436ffc37124d5ea797eb08535b52e
 
-FRONTEND_URL=http://localhost
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost
+FRONTEND_URL=http://15.188.100.106
+ALLOWED_ORIGINS=http://15.188.100.106
+DOMAIN=http://15.188.100.106
+
 
 
 --- services/payments/Dockerfile ---
