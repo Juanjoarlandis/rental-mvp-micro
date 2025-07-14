@@ -1,14 +1,7 @@
 version: "3.9"
 
-# ──────────────────────────────── NETWORKS (opcional) ───────────────────────────
-# Si no declaras redes, Compose crea una por defecto que ya es suficiente.
-# networks:
-#   backend:
-
-# ─────────────────────────────────── SERVICES ───────────────────────────────────
 services:
-
-  # ────────────── AUTH ──────────────────────────────────────────────────────────
+  # ──────────────── AUTH ───────────────────────────────
   auth-db:
     image: postgres:15
     container_name: auth-db
@@ -23,8 +16,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # networks:
-    #   - backend
 
   auth-migrate:
     build: ./services/auth
@@ -34,26 +25,20 @@ services:
     depends_on:
       auth-db:
         condition: service_healthy
-    restart: "no"                       # solo se ejecuta una vez
-    # networks:
-    #   - backend
+    restart: "no"                     # se ejecuta una sola vez
 
   auth:
     build: ./services/auth
     container_name: auth-service
     env_file: ./services/auth/.env
-    environment:
-      - JWT_SECRET=${JWT_SECRET}
-    ports:
-      - "8001:8000"                     # API Auth
+    # ⇒ puerto sólo interno (comenta la línea siguiente si quieres exponerlo)
+    # ports: ["8001:8000"]
     restart: unless-stopped
     depends_on:
       auth-migrate:
         condition: service_completed_successfully
-    # networks:
-    #   - backend
 
-  # ────────────── CATALOG ───────────────────────────────────────────────────────
+  # ──────────────── CATALOG ────────────────────────────
   catalog-db:
     image: postgres:15
     container_name: catalog-db
@@ -68,8 +53,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # networks:
-    #   - backend
 
   catalog-migrate:
     build: ./services/catalog
@@ -80,23 +63,18 @@ services:
       catalog-db:
         condition: service_healthy
     restart: "no"
-    # networks:
-    #   - backend
 
   catalog:
     build: ./services/catalog
     container_name: catalog-service
     env_file: ./services/catalog/.env
-    ports:
-      - "8002:8000"                     # API Catalog
+    # ports: ["8002:8000"]
     restart: unless-stopped
     depends_on:
       catalog-migrate:
         condition: service_completed_successfully
-    # networks:
-    #   - backend
 
-  # ────────────── RENTALS ───────────────────────────────────────────────────────
+  # ──────────────── RENTALS ────────────────────────────
   rentals-db:
     image: postgres:15
     container_name: rentals-db
@@ -111,8 +89,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # networks:
-    #   - backend
 
   rentals-migrate:
     build: ./services/rentals
@@ -123,64 +99,49 @@ services:
       rentals-db:
         condition: service_healthy
     restart: "no"
-    # networks:
-    #   - backend
 
   rentals:
     build: ./services/rentals
     container_name: rentals-service
     env_file: ./services/rentals/.env
-    ports:
-      - "8003:8000"                     # API Rentals
+    # ports: ["8003:8000"]
     restart: unless-stopped
     depends_on:
       rentals-migrate:
         condition: service_completed_successfully
       catalog:
         condition: service_started
-    # networks:
-    #   - backend
 
-  # ────────────── UPLOAD ────────────────────────────────────────────────────────
+  # ──────────────── UPLOAD ─────────────────────────────
   upload:
     build: ./services/upload
     container_name: upload-service
     env_file: ./services/upload/.env
-    environment:
-      - JWT_SECRET=${JWT_SECRET}        # misma clave que Auth
     volumes:
-      - uploads_data:/app/uploads       # carpeta de imágenes
-    ports:
-      - "8004:8000"                     # API Upload
+      - uploads_data:/app/app/uploads        # imágenes persistentes
+    # ports: ["8004:8000"]
     restart: unless-stopped
     depends_on:
       auth:
         condition: service_started
-    # networks:
-    #   - backend
 
-  # ────────────── PAYMENTS (Stripe) ─────────────────────────────────────────────
+  # ──────────────── PAYMENTS ───────────────────────────
   payments:
     build: ./services/payments
     container_name: payments-service
     env_file: ./services/payments/.env
-    ports:
-      - "8005:8000"                     # API Payments
+    # ports: ["8005:8000"]
     restart: unless-stopped
     depends_on:
       auth:
         condition: service_started
-    # networks:
-    #   - backend
 
-  # ────────────── FRONTEND SPA ──────────────────────────────────────────────────
+  # ──────────────── FRONTEND (Nginx) ───────────────────
   frontend:
-    build:
-      context: ./services/frontend
-      dockerfile: Dockerfile
+    build: ./services/frontend
     container_name: frontend-service
     ports:
-      - "80:80"                         # UI pública
+      - "80:80"                               # único puerto público
     restart: unless-stopped
     depends_on:
       - auth
@@ -188,17 +149,9 @@ services:
       - rentals
       - upload
       - payments
-    # networks:
-    #   - backend
 
-# ─────────────────────────────────── VOLUMES ────────────────────────────────────
 volumes:
   auth_db_data:
   catalog_db_data:
   rentals_db_data:
   uploads_data:
-
-# ────────────────────────────────── (opt) NETWORKS ──────────────────────────────
-# networks:
-#   backend:
-#     driver: bridge
