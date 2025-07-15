@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import AddItemModal from './add-product-modal/AddProductModal';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
+
 /* -------------------------------------------------- */
 /*                    Tipado filtros                  */
 /* -------------------------------------------------- */

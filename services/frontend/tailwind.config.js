@@ -28,13 +28,22 @@ module.exports = {
             boxShadow: {
                 card: '0 1px 3px rgba(0,0,0,.08)',
                 cardHover: '0 4px 12px rgba(0,0,0,.12)'
-            }
+            },
+            keyframes: {
+                fadeIn: {
+                    'to': { opacity: 1, transform: 'scale(1)' },
+                },
+            },
+            animation: {
+                fadeIn: 'fadeIn .5s ease-out forwards',
+            },
         }
     },
     plugins: [
         require('@tailwindcss/forms'),
         require('@tailwindcss/typography'),
         require('@tailwindcss/line-clamp'),
-        require('@tailwindcss/container-queries') // 🆕
+        require('@tailwindcss/container-queries'), // 🆕
+        require('@tailwindcss/aspect-ratio')
     ]
 };

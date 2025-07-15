@@ -1,1171 +1,4204 @@
---- catalog/requirements.txt ---
-
-fastapi==0.116.0
-uvicorn==0.35.0
-pydantic==2.11.7
-pydantic-core==2.33.2
-pydantic-settings==2.10.1
-SQLAlchemy==2.0.41
-python-jose[cryptography]==3.5.0
-python-multipart==0.0.6
-python-dotenv==1.1.1
-alembic==1.16.4
-email-validator==2.1.1     # (pydantic extra)
-uvloop==0.21.0
-httptools==0.6.4
-psycopg2-binary==2.9.9 
-
---- catalog/.env ---
-
-DATABASE_URL=postgresql+psycopg2://catalog_user:catalog_pass@catalog-db:5432/catalog
-SECRET_KEY=SuperClaveUltraSecreta
-FRONTEND_URL=http://frontend
-
---- catalog/Dockerfile ---
-FROM python:3.12-slim
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libffi-dev build-essential libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# código + alembic + env
-COPY app/         ./app
-COPY alembic.ini  .
-COPY migrations/  ./migrations
-COPY .env         .
-
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+--- frontend/index.html ---
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rental-MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
 
 
---- catalog/test_endpoints.sh ---
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-
-AUTH=http://localhost:8001/api/auth
-CAT=http://localhost:8002/api
-USERNAME=demo; EMAIL=demo@example.com; PASSWORD=demo
-
-j() { jq -C .; }            # pretty-json coloreado
-auth() { curl -s "$@" "${AUTHZ[@]}"; }
-
-echo "────────── 1) SIGN-UP ──────────"
-curl -s -X POST "$AUTH/signup" \
-     -H 'Content-Type: application/json' \
-     -d "{\"username\":\"$USERNAME\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
-  | j || echo "(usuario ya existe)"
-
-echo "────────── 2) LOGIN ────────────"
-TOKEN=$(curl -s -X POST "$AUTH/token" \
-              -H 'Content-Type: application/x-www-form-urlencoded' \
-              -d "username=$USERNAME&password=$PASSWORD" \
-        | jq -r .access_token)
-AUTHZ=(-H "Authorization: Bearer $TOKEN")
-echo "JWT => $TOKEN"
-
-echo "────────── 3) /me ──────────────"
-# Detecta cuál de los dos paths expone el servicio
-for ME in "$AUTH/me" "$AUTH/users/me"; do
-  CODE=$(curl -s -o /dev/null -w '%{http_code}' "$ME" "${AUTHZ[@]}")
-  [[ $CODE == 200 ]] && { curl -s "$ME" "${AUTHZ[@]}" | j; break; }
-done
-
-echo "────────── 4) CATEGORIES ───────"
-declare -A CIDs
-for NAME in "Herramientas" "Decoración"; do
-  # ¿existe ya?
-  CID=$(curl -s "$CAT/categories/" | jq ".[] | select(.name==\"$NAME\") | .id")
-  if [[ -z $CID ]]; then
-     CID=$(curl -s -X POST "$CAT/categories/" "${AUTHZ[@]}" \
-                 -H 'Content-Type: application/json' \
-                 -d "{\"name\":\"$NAME\"}" | jq -r .id)
-  fi
-  CIDs[$NAME]=$CID
-  echo "• $NAME id=${CID}"
-done
-
-echo "────────── 5) ITEMS CRUD ───────"
-DATA='{
-  "name":"Taladro Bosch",
-  "description":"800 W",
-  "price_per_h":4.5,
-  "image_urls":["https://picsum.photos/seed/taladro/800/600"]
-}'
-# Sólo enviamos categories si tenemos IDs válidos
-[[ -n ${CIDs[Herramientas]} ]] && \
-  DATA=$(jq --argjson cid ${CIDs[Herramientas]} '. + {categories:[$cid]}' <<<"$DATA")
-
-ITEM=$(curl -s -X POST "$CAT/items/" "${AUTHZ[@]}" \
-            -H 'Content-Type: application/json' \
-            -d "$DATA")
-echo "$ITEM" | j
-IID=$(echo "$ITEM" | jq -r .id)
-
-echo "── GET públicos /items?available=true"
-curl -s "$CAT/items?available=true" | j
-
-echo "── GET privados  /items/me"
-auth "$CAT/items/me" | j
-
-echo "── PATCH /items/$IID (añade Decoración, cambia precio)"
-PATCH=$(jq --argjson cid ${CIDs[Decoración]} '{price_per_h:5.0,categories:[$cid]}' <<<"{}")
-auth -X PATCH "$CAT/items/$IID" \
-     -H 'Content-Type: application/json' \
-     -d "$PATCH" | j
-
-echo "── DELETE /items/$IID"
-auth -X DELETE "$CAT/items/$IID" -w '\n(status %{http_code})\n'
-
-echo "── /items/me debería estar vacío"
-auth "$CAT/items/me" | j
-
-echo "────────── 6) UPLOAD ───────────"
-if [[ -f sample.jpg ]]; then
-  auth -X POST "$CAT/upload/" -F "file=@sample.jpg" | j
-else
-  echo "(sin sample.jpg; omitiendo)"
-fi
-
-echo -e "\n✅  tests completados"
-
-
---- catalog/alembic.ini ---
-[alembic]
-script_location = migrations
-prepend_sys_path = .
-sqlalchemy.url = postgresql+psycopg2://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-
-version_path_separator = os
-
-
-# ────────────── Logging ──────────────
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-
-[logger_root]
-level    = WARN
-handlers = console
-
-
-[logger_sqlalchemy]
-level     = WARN
-qualname  = sqlalchemy.engine
-handlers  = console
-
-
-[logger_alembic]
-level     = INFO
-qualname  = alembic
-handlers  = console
-
-
-[handler_console]
-class     = StreamHandler
-args      = (sys.stderr,)
-formatter = generic
-
-
-[formatter_generic]
-format   = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt  = %H:%M:%S
-
-
---- catalog/migrations/script.py.mako ---
-
-"""${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-"""
-from alembic import op
-import sqlalchemy as sa
-${imports if imports else ""}
-
-revision = ${repr(up_revision)}
-down_revision = ${repr(down_revision)}
-branch_labels = ${repr(branch_labels)}
-depends_on = ${repr(depends_on)}
-
-
-def upgrade():
-    ${upgrades if upgrades else "pass"}
-
-
-def downgrade():
-    ${downgrades if downgrades else "pass"}
-
-
---- catalog/migrations/README ---
-
-
---- catalog/migrations/env.py ---
-
-"""Alembic environment for Catalog service."""
-from __future__ import annotations
-
-from logging.config import fileConfig
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-# ─── configuración ────────────────────────────────────────────────────────
-config = context.config
-fileConfig(config.config_file_name)
-
-# Metadata
-from app.models.models import Base                                   # noqa: E402
-target_metadata = Base.metadata
-target_metadata.naming_convention = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s",
+--- frontend/package.json ---
+{
+  "name": "rental-mvp-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0 --fix"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
+    "@hookform/resolvers": "^3.3.4",
+    "@stripe/react-stripe-js": "^2.3.0",
+    "@stripe/stripe-js": "^1.53.0",
+    "@tanstack/react-query": "^5.38.0",
+    "axios": "^1.6.8",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "focus-trap-react": "^10.2.1",
+    "react": "^18.3.1",
+    "react-day-picker": "^9.8.0",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.60.0",
+    "react-hot-toast": "^2.5.2",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^6.23.1",
+    "react-swipeable": "^7.0.2",
+    "zod": "^3.23.4",
+    "zxcvbn": "^4.4.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/container-queries": "",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/line-clamp": "^0.4.4",
+    "@tailwindcss/typography": "^0.5.16",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.2",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.0",
+    "vite": "^5.3.1"
+  }
 }
 
-# URL de la BD → .env
-from app.core.config import settings                                # noqa: E402
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+--- frontend/vite.config.ts ---
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    https: true,  // MODIFIED: HTTPS en dev (usa cert auto-firmado de Vite)
+    proxy: {
+      "/api/auth":       "https://localhost:8001",  // MODIFIED: Cambiado a HTTPS
+      "/api/items":      "https://localhost:8002",
+      "/api/categories": "https://localhost:8002",
+      "/api/rentals":    "https://localhost:8003",
+      "/api/upload":     "https://localhost:8004",
+      "/api/payments":   "https://localhost:8005",
+      "/uploads":        "https://localhost:8004"
+    }
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true  // This forces proper transformation of mixed ESM/CJS modules like clsx
+    }
+  }
+});
+
+--- frontend/.env ---
+VITE_STRIPE_PK=pk_test_51RkNe1BAdmER2zaJNEdcxq6T7uBwtyGDiHaFRF5I9LjGGbbYxmvPfdffr4HLqZy753gB6ixJRFfu7HXRsntuCGyH00szhzRTcx
+FRONTEND_URL=http://frontend
 
 
-def run_migrations_offline() -> None:
-    context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-        compare_type=True,
-        compare_server_default=True,
+--- frontend/Dockerfile ---
+# ───────────── Etapa 1: build Vite ─────────────
+FROM node:20 AS builder
+WORKDIR /frontend
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+RUN npm run build          # genera /frontend/dist
+
+# ───────────── Etapa 2: Nginx ─────────────
+FROM nginx:1.27-alpine
+
+RUN apk add --no-cache curl  # Para healthcheck
+
+# Copia estáticos compilados
+COPY --from=builder /frontend/dist /usr/share/nginx/html
+
+# Proxy /api → backend
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+--- frontend/nginx.conf ---
+server {
+    listen 80;
+    server_name 15.188.100.106;  # O localhost para testing local
+
+    # Redirigir todo HTTP a HTTPS (opcional, pero recomendado)
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name 15.188.100.106;  # O localhost
+
+    # Self-signed certificates (montados via volumen)
+    ssl_certificate /etc/nginx/certs/selfsigned.crt;
+    ssl_certificate_key /etc/nginx/certs/selfsigned.key;
+
+    # Config básica de seguridad (sin HSTS para self-signed)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # ───────── Cabeceras comunes para upstream ─────────
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # ───────── Fichero SPA (Vite) ─────────
+    root /usr/share/nginx/html;
+    index index.html;
+    client_max_body_size 100M;
+
+    # ───────── Health-check global ─────────
+    location = /health {
+        proxy_pass http://auth-service:8000;
+    }
+
+    # ───────── Micro-servicios ─────────
+    location /api/auth/       { proxy_pass http://auth-service:8000; }
+    location /api/items/      { proxy_pass http://catalog-service:8000; }
+    location /api/categories/ { proxy_pass http://catalog-service:8000; }
+    location /api/rentals/    { proxy_pass http://rentals-service:8000; }
+    location /api/upload/     { proxy_pass http://upload-service:8000; }
+    location /api/payments/   { proxy_pass http://payments-service:8000; }
+
+    # Ficheros subidos
+    location /uploads/        { proxy_pass http://upload-service:8000; }
+
+    # ───────── SPA fallback ─────────
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+--- frontend/tsconfig.json ---
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": [
+            "DOM",
+            "DOM.Iterable",
+            "ES2022"
+        ],
+        "module": "ESNext",
+        "moduleResolution": "Node",
+        "types": [
+            "vite/client"
+        ],
+        "strict": true,
+        "jsx": "react-jsx",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": [
+        "src"
+    ]
+}
+
+--- frontend/postcss.config.js ---
+// rental-mvp/frontend/postcss.config.js
+export default {
+    plugins: {
+        tailwindcss: {},
+        autoprefixer: {}
+    }
+};
+
+
+--- frontend/tailwind.config.js ---
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+    content: ['./index.html', './src/**/*.{ts,tsx}'],
+    theme: {
+        //   ↓↓↓ breakpoints fluidos
+        screens: {
+            xs: '375px',
+            sm: '640px',
+            md: '768px',
+            lg: '1024px',
+            xl: '1280px',
+            '2xl': '1440px',
+            '3xl': '1920px'
+        },
+        container: { center: true, padding: '1rem' },
+        extend: {
+            fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+            colors: {
+                brand: {
+                    DEFAULT: '#0d6efd',
+                    hover: '#0b5ed7',
+                    dark: '#014bb8',  // Darkened version of DEFAULT
+                    'hover-dark': '#074196'  // Darkened version of hover
+                },
+                surface: '#ffffff',
+                'surface-dark': '#1f2937'  // Optional dark surface if needed elsewhere
+            },
+            boxShadow: {
+                card: '0 1px 3px rgba(0,0,0,.08)',
+                cardHover: '0 4px 12px rgba(0,0,0,.12)'
+            },
+            keyframes: {
+                fadeIn: {
+                    'to': { opacity: 1, transform: 'scale(1)' },
+                },
+            },
+            animation: {
+                fadeIn: 'fadeIn .5s ease-out forwards',
+            },
+        }
+    },
+    plugins: [
+        require('@tailwindcss/forms'),
+        require('@tailwindcss/typography'),
+        require('@tailwindcss/line-clamp'),
+        require('@tailwindcss/container-queries') // 🆕
+    ]
+};
+
+--- frontend/src/App.tsx ---
+// src/App.tsx
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+
+import ErrorBoundary from "./ErrorBoundary";
+import { AuthProvider } from "./hooks/useAuth";
+
+import Header from "./components/layout/Header";
+import Footer from "./components/layout/Footer";
+
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Protected from "./Protected";
+import ForgotPassword from "./pages/ForgotPassword";    
+import ResetPassword from "./pages/ResetPassword";  
+
+import "./styles/global.css";
+
+/* ─── Stripe ─────────────────────────────────────────────────────────── */
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PK as string /* pk_test_xxx */
+);
+/* ─────────────────────────────────────────────────────────────────────── */
+
+const queryClient = new QueryClient();
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Elements stripe={stripePromise}>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <Header />
+
+              <Suspense
+                fallback={
+                  <p className="py-32 text-center text-gray-500">Cargando…</p>
+                }
+              >
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />  
+                  <Route path="/reset-password" element={<ResetPassword />} />   
+                  {/* ---------- RUTA PROTEGIDA ---------- */}
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <Protected>
+                        <Dashboard />
+                      </Protected>
+                    }
+                  />
+                </Routes>
+              </Suspense>
+
+              <Footer />
+            </ErrorBoundary>
+          </BrowserRouter>
+        </Elements>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+
+
+--- frontend/src/api.ts ---
+import axios from "axios";
+
+/**
+ * Singleton Axios con:
+ *  · baseURL "/api"
+ *  · Authorization automático si hay token en localStorage
+ */
+export const api = axios.create({ baseURL: "/api" });
+
+api.interceptors.request.use(cfg => {
+  const token = localStorage.getItem("token");
+  if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  cfg.withCredentials = true;  // MODIFIED: Para CSRF si backend usa cookies (opcional)
+  return cfg;
+});
+
+--- frontend/src/ErrorBoundary.tsx ---
+import React, { ErrorInfo, ReactNode } from "react";
+
+type Props = { children: ReactNode };
+type State = { hasError: boolean };
+
+class ErrorBoundary extends React.Component<Props, State> {
+  state: State = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Aquí podrías enviar logs a Sentry, LogRocket, etc.
+    console.error("⛔ Unhandled error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main className="flex min-h-[60vh] items-center justify-center">
+          <p className="rounded-md bg-red-50 p-6 text-center text-lg text-red-600 shadow">
+            ¡Ups! Algo ha ido mal.<br />
+            Intenta recargar la página.
+          </p>
+        </main>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
+
+
+--- frontend/src/main.tsx ---
+// src/main.tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { Toaster } from 'react-hot-toast';          // 🆕
+import './styles/global.css';
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <App />
+    <Toaster                                         // 🆕
+      position="top-right"
+      toastOptions={{
+        style: { fontSize: '0.875rem' },            // 14 px
+        duration: 3000
+      }}
+    />
+  </React.StrictMode>
+);
+
+
+--- frontend/src/utils.ts ---
+// utils.ts
+/**
+ * URL base de la API.  Ajusta en .env.local si no usas localhost:8000
+ *   VITE_API_BASE_URL=https://tu-dominio.com
+ */
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? window.location.origin;
+
+/**  
+ * Devuelve una URL de imagen válida.
+ * - Si ya es absoluta → la deja tal cual.
+ * - Si empieza por “/” → la concatena con API_BASE.
+ * - Si viene `undefined` → usa el *fallback*.
+ */
+export function resolveImage(url: string | undefined, fallback: string) {
+  if (!url) return fallback;
+  if (/^https?:\/\//i.test(url)) return url; // absoluta
+  return `${API_BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+
+--- frontend/src/Protected.tsx ---
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "./hooks/useAuth";
+
+export default function Protected({ children }: { children: JSX.Element }) {
+  const { token } = useAuth();
+  const loc = useLocation();
+  return token ? children : <Navigate to="/login" replace state={{ from: loc }} />;
+}
+
+
+--- frontend/src/assets/payments/paypal.svg ---
+<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="24" cy="24" r="20" fill="#0070BA"/>
+<path d="M32.3305 18.0977C32.3082 18.24 32.2828 18.3856 32.2542 18.5351C31.2704 23.5861 27.9046 25.331 23.606 25.331H21.4173C20.8916 25.331 20.4486 25.7127 20.3667 26.2313L19.2461 33.3381L18.9288 35.3527C18.8755 35.693 19.1379 36 19.4815 36H23.3634C23.8231 36 24.2136 35.666 24.286 35.2127L24.3241 35.0154L25.055 30.3772L25.1019 30.1227C25.1735 29.6678 25.5648 29.3338 26.0245 29.3338H26.6051C30.3661 29.3338 33.3103 27.8068 34.1708 23.388C34.5303 21.5421 34.3442 20.0008 33.393 18.9168C33.1051 18.59 32.748 18.3188 32.3305 18.0977Z" fill="white" fill-opacity="0.6"/>
+<path d="M31.3009 17.6871C31.1506 17.6434 30.9955 17.6036 30.8364 17.5678C30.6766 17.5328 30.5127 17.5018 30.3441 17.4748C29.754 17.3793 29.1074 17.334 28.4147 17.334H22.5676C22.4237 17.334 22.2869 17.3666 22.1644 17.4254C21.8948 17.5551 21.6944 17.8104 21.6459 18.1229L20.402 26.0013L20.3662 26.2311C20.4481 25.7126 20.8911 25.3308 21.4168 25.3308H23.6055C27.9041 25.3308 31.2699 23.5851 32.2537 18.5349C32.2831 18.3854 32.3078 18.2398 32.33 18.0975C32.0811 17.9655 31.8115 17.8525 31.5212 17.7563C31.4496 17.7324 31.3757 17.7094 31.3009 17.6871Z" fill="white" fill-opacity="0.8"/>
+<path d="M21.6461 18.1231C21.6946 17.8105 21.895 17.5552 22.1646 17.4264C22.2879 17.3675 22.4239 17.3349 22.5678 17.3349H28.4149C29.1077 17.3349 29.7542 17.3803 30.3444 17.4757C30.513 17.5027 30.6768 17.5338 30.8367 17.5687C30.9957 17.6045 31.1508 17.6443 31.3011 17.688C31.3759 17.7103 31.4498 17.7334 31.5222 17.7564C31.8125 17.8527 32.0821 17.9664 32.331 18.0976C32.6237 16.231 32.3287 14.9601 31.3194 13.8093C30.2068 12.5424 28.1986 12 25.629 12H18.169C17.6441 12 17.1963 12.3817 17.1152 12.9011L14.0079 32.5969C13.9467 32.9866 14.2473 33.3381 14.6402 33.3381H19.2458L20.4022 26.0014L21.6461 18.1231Z" fill="white"/>
+</svg>
+
+--- frontend/src/assets/payments/mastercard.svg ---
+<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 -11 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="0.5" y="0.5" width="69" height="47" rx="5.5" fill="white" stroke="#D9D9D9"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M35.3945 34.7619C33.0114 36.8184 29.92 38.0599 26.5421 38.0599C19.0047 38.0599 12.8945 31.8788 12.8945 24.254C12.8945 16.6291 19.0047 10.448 26.5421 10.448C29.92 10.448 33.0114 11.6895 35.3945 13.7461C37.7777 11.6895 40.869 10.448 44.247 10.448C51.7843 10.448 57.8945 16.6291 57.8945 24.254C57.8945 31.8788 51.7843 38.0599 44.247 38.0599C40.869 38.0599 37.7777 36.8184 35.3945 34.7619Z" fill="#ED0006"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M35.3945 34.7619C38.3289 32.2296 40.1896 28.4616 40.1896 24.254C40.1896 20.0463 38.3289 16.2783 35.3945 13.7461C37.7777 11.6895 40.869 10.448 44.247 10.448C51.7843 10.448 57.8945 16.6291 57.8945 24.254C57.8945 31.8788 51.7843 38.0599 44.247 38.0599C40.869 38.0599 37.7777 36.8184 35.3945 34.7619Z" fill="#F9A000"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M35.3946 13.7461C38.329 16.2784 40.1897 20.0463 40.1897 24.254C40.1897 28.4616 38.329 32.2295 35.3946 34.7618C32.4603 32.2295 30.5996 28.4616 30.5996 24.254C30.5996 20.0463 32.4603 16.2784 35.3946 13.7461Z" fill="#FF5E00"/>
+</svg>
+
+--- frontend/src/assets/payments/visa.svg ---
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg width="800px" height="800px" viewBox="0 -139.5 750 750" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    
+    <desc>Created with Sketch.</desc>
+    <defs>
+
+</defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="visa" fill="#393939" fill-rule="nonzero">
+            <path d="M52.8846154,28.2035928 C39.6085397,28.2035928 28.8461538,38.7262417 28.8461538,51.7065868 L28.8461538,419.293413 C28.8461538,432.273758 39.6085397,442.796407 52.8846154,442.796407 L697.115385,442.796407 C710.39146,442.796407 721.153846,432.273758 721.153846,419.293413 L721.153846,51.7065868 C721.153846,38.7262417 710.39146,28.2035928 697.115385,28.2035928 L52.8846154,28.2035928 Z M52.8846154,0 L697.115385,0 C726.322751,-5.0099645e-15 750,23.1498275 750,51.7065868 L750,419.293413 C750,447.850173 726.322751,471 697.115385,471 L52.8846154,471 C23.6772488,471 3.41607085e-15,447.850173 0,419.293413 L0,51.7065868 C-3.41607085e-15,23.1498275 23.6772488,5.0099645e-15 52.8846154,0 Z" id="outline">
+
+</path>
+            <g id="Logo" transform="translate(60.000000, 139.000000)">
+                <polygon id="Shape" points="222.597614 191.12625 254.442205 4.26252273 305.375795 4.26252273 273.50925 191.12625">
+
+</polygon>
+                <path d="M457.520795,8.29261364 C447.429341,4.50688636 431.61825,0.444340909 411.871568,0.444340909 C361.544114,0.444340909 326.092295,25.7884773 325.790659,62.1117955 C325.507159,88.9622045 351.099477,103.940932 370.419477,112.879295 C390.244432,122.038159 396.910023,127.879977 396.815523,136.058523 C396.689523,148.584068 380.983432,154.306568 366.343568,154.306568 C345.957341,154.306568 335.127068,151.474432 318.400568,144.497659 L311.837114,141.527114 L304.688523,183.359114 C316.585023,188.57475 338.583477,193.094523 361.424795,193.328386 C414.964295,193.328386 449.721205,168.274432 450.116386,129.486477 C450.30825,108.229705 436.738432,92.0520682 407.353705,78.7161136 C389.550477,70.07175 378.647659,64.3034318 378.763159,55.55025 C378.763159,47.7831136 387.991705,39.4776136 407.931205,39.4776136 C424.587068,39.2189318 436.651568,42.8509773 446.051932,46.6367045 L450.616568,48.7930227 L457.520795,8.29261364" id="Shape">
+
+</path>
+                <path d="M588.586568,4.26252273 L549.229705,4.26252273 C537.037295,4.26252273 527.91375,7.59006818 522.55875,19.7586136 L446.915795,191.006932 L500.399932,191.006932 C500.399932,191.006932 509.145477,167.981386 511.123295,162.926114 C516.967977,162.926114 568.924841,163.006295 576.353114,163.006295 C577.876568,169.547795 582.550023,191.006932 582.550023,191.006932 L629.811477,191.006932 L588.586568,4.26252273 Z M526.143068,124.92375 C530.355477,114.157432 546.43575,72.6881591 546.43575,72.6881591 C546.135068,73.1854773 550.616659,61.8693409 553.189159,54.8534318 L556.632205,70.96425 C556.632205,70.96425 566.384795,115.569205 568.42275,124.922795 L526.143068,124.922795 L526.143068,124.92375 Z" id="Path">
+
+</path>
+                <path d="M179.361477,4.26252273 L129.496023,131.689568 L124.183023,105.793705 C114.900068,75.94125 85.9773409,43.5993409 53.6430682,27.4073864 L99.2388409,190.828432 L153.127705,190.766386 L233.313341,4.26252273 L179.361477,4.26252273" id="Path">
+
+</path>
+                <path d="M82.9686136,4.26252273 L0.838568182,4.26252273 L0.188522727,8.15038636 C64.0848409,23.6178409 106.364523,60.9968864 123.914795,105.909205 L106.056205,20.0382955 C102.973023,8.20575 94.0308409,4.67488636 82.9686136,4.26252273" id="Shape">
+
+</path>
+            </g>
+        </g>
+    </g>
+</svg>
+
+--- frontend/src/hooks/useAuth.tsx ---
+import React, { createContext, useContext, useState } from "react";
+
+/* ------------------------------------------------------------------ */
+/*                       Contexto & proveedor                         */
+/* ------------------------------------------------------------------ */
+type AuthContextT = {
+  token: string | null;
+  login: (t: string) => void;
+  logout: () => void;
+};
+const AuthContext = createContext<AuthContextT | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem("token")
+  );
+
+  const login = (t: string) => {
+    localStorage.setItem("token", t);
+    setToken(t);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ token, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*                           Hooks util                               */
+/* ------------------------------------------------------------------ */
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
+  return ctx;
+};
+
+/** Lee el token directo de localStorage (válido fuera de React). */
+export const getTokenLS = () => localStorage.getItem("token");
+
+
+--- frontend/src/hooks/useStripe.ts ---
+// src/hooks/useStripe.ts
+import { loadStripe, Stripe } from "@stripe/stripe-js";
+import { useEffect, useState } from "react";
+
+export function useStripe() {
+  const [stripe, setStripe] = useState<Stripe | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const pk = import.meta.env.VITE_STRIPE_PK;
+      if (pk && !stripe) {
+        const s = await loadStripe(pk);
+        setStripe(s);
+      }
+    })();
+  }, [stripe]);
+
+  return stripe;
+}
+
+
+--- frontend/src/styles/global.css ---
+/* frontend/src/styles/global.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- BASE ---------- */
+@layer base {
+  html { @apply scroll-smooth; }
+  body { 
+    @apply bg-gray-50 text-gray-800 antialiased font-sans dark:bg-gray-900 dark:text-gray-100;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+CiAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC45IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+CiAgPC9maWx0ZXI+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI25vaXNlRmlsdGVyKSIgb3BhY2l0eT0iMC4xIi8+ICA8IS0tPC9zdmc+");
+    background-repeat: repeat;
+    background-blend-mode: overlay;  /* 🆕 Blend para profundidad sin afectar contenido */
+  }
+}
+
+/* ---------- COMPONENTS ---------- */
+@layer components {
+  /* Botones - REFACTORED: Añadidas variants (secondary, danger, loading), loading state con spinner, animaciones (hover scale, active bounce), focus ring mejorado, dark mode. */
+  .btn        { 
+    @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; 
+  }  
+  .btn--secondary { 
+    @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; 
+  }
+  .btn--danger { 
+    @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; 
+  }
+  .btn--ghost { 
+    @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; 
+  }
+  .btn--loading { 
+    @apply cursor-wait; /* +spinner en componentes */
+  }
+
+  /* Badges */
+  .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
+  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }  /* 🆕 Dark variants */
+  .badge--danger { @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
+
+  /* Campos select genérico */
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }  /* 🆕 Dark */
+
+  /* Toast */
+  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }  /* 🆕 Dark */
+  .toast-error   { @apply bg-red-600 text-white dark:bg-red-700; }
+
+  /* Títulos fluidos (ejemplo h1) */
+  h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); } /* 36 px → 56 px aprox */
+}
+
+/* ---------- UTILITIES PERSONALIZADAS ---------- */
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  /* Evita re-pintados innecesarios en grandes listas */
+  .content-auto { content-visibility: auto; }
+
+  /* Oculta scrollbar (usarlo con cuidado) */
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* Animaciones on-scroll - REFACTORED: Añadida scale para más dinamismo */
+  .fade-in { opacity: 0; transform: translateY(20px) scale(0.98); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+  .fade-in.visible { opacity: 1; transform: translateY(0) scale(1); }
+
+  /* Count-up para stats */
+  .count-up { counter-reset: num var(--num); }
+  .count-up::after { content: counter(num); }
+  @keyframes count { from { --num: 0; } to { --num: var(--target); } }
+}
+
+/* 🆕 Media query para fine-tune dark mode: noise menos intenso */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-blend-mode: soft-light;  /* 🆕 Suaviza noise en dark para no "claror" inverso */
+  }
+}
+
+--- frontend/src/features/auth/forgot.ts ---
+import { api } from "../../api";
+
+/**
+ * Solicita el _reset_token_ para un usuario existente.
+ * Devuelve el token si la operación fue correcta (404 si no existe).
+ */
+export async function forgot(username: string): Promise<string> {
+  const { data } = await api.post<{ reset_token: string }>(
+    "/auth/password/forgot",
+    { username }
+  );
+  return data.reset_token;
+}
+
+
+--- frontend/src/features/auth/register.ts ---
+import { api } from "../../api";
+
+/** Lanza 400 si el username o el email ya están en uso. */
+export async function register(
+  username: string,
+  email: string,
+  password: string
+): Promise<void> {
+  await api.post("/auth/signup", { username, email, password });
+}
+
+
+--- frontend/src/features/auth/login.ts ---
+import { api } from "../../api";
+
+export async function login(username: string, password: string): Promise<string> {
+  const { data } = await api.post(
+    "/auth/token",
+    new URLSearchParams({ username, password }),
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+  );
+  return data.access_token as string;
+}
+
+
+--- frontend/src/features/auth/reset.ts ---
+import { api } from "../../api";
+
+/**
+ * Envía el nuevo password junto con el token recibido por “forgot”.
+ * Lanza 400 si el token es inválido / expiró.
+ */
+export async function reset(token: string, newPassword: string): Promise<void> {
+  await api.post("/auth/password/reset", { token, new_password: newPassword });
+}
+
+
+--- frontend/src/features/categories/useCategories.ts ---
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../api";
+
+export type Category = { id: number; name: string };
+
+export default function useCategories() {
+  const { data, isLoading } = useQuery<Category[]>({
+    queryKey: ["categories"],
+    queryFn: () => api.get<Category[]>("/categories/").then(r => r.data),
+    staleTime: 5 * 60_000 // 5 min
+  });
+
+  return { data: data ?? [], loading: isLoading };
+}
+
+
+--- frontend/src/features/items/useItems.ts ---
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../api';
+import type { Item } from './types';
+
+/**
+ * Hook que devuelve la lista pública de ítems.
+ * Acepta los mismos parámetros de querystring que la API (name, min_price…).
+ */
+export function useItems(params?: URLSearchParams) {
+  const queryKey = ['items', params?.toString() ?? ''];
+
+  const { data, isLoading, refetch } = useQuery<Item[]>({
+    queryKey,
+    queryFn: () =>
+      api.get<Item[]>('/items/', { params }).then(r => r.data),
+    staleTime: 60_000 // 1 min
+  });
+
+  return { data: data ?? [], loading: isLoading, refetch };
+}
+
+/* Reexportamos el tipo para mantener compatibilidad con imports existentes */
+export type { Item };
+
+
+--- frontend/src/features/items/ItemList.tsx ---
+import { useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
+import Container from '../../components/shared/Container';
+import ItemCard from '../../components/ui/ItemCard';
+import SkeletonCard from '../../components/ui/SkeletonCard';
+import FiltersSidebar from '../../components/filters/FiltersSidebar';
+import { useItems } from './useItems';
+import { useAuth } from '../../hooks/useAuth';
+import AddItemModal from './add-product-modal/AddProductModal';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+
+
+/* -------------------------------------------------- */
+/*                    Tipado filtros                  */
+/* -------------------------------------------------- */
+type FiltersT = {
+  name?: string;
+  min_price?: number;
+  max_price?: number;
+  categories?: number[];
+  order?: 'price_asc' | 'price_desc' | 'name';
+};
+
+export default function ItemList() {
+  /* ------------------------------ filtros ------------------------------ */
+  const [filters, setFilters] = useState<FiltersT>({});
+
+  /* Serializamos filtros → query-string */
+  const params = useMemo(() => {
+    const p = new URLSearchParams();
+
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v === undefined || v === '') return;
+      if (Array.isArray(v)) v.forEach(val => p.append(k, String(val)));
+      else p.set(k, String(v));
+    });
+
+    /* orden (price_asc | price_desc | name) */
+    if (filters.order) {
+      const [field, dir] = filters.order.split('_');
+      p.set('order_by', field === 'price' ? 'price' : 'name');
+      p.set('order_dir', dir);
+    }
+    return p;
+  }, [filters]);
+
+  const { data: items, loading, refetch } = useItems(params);
+  const { token } = useAuth();
+
+  /* ----------------------- drawer móvil filtros ----------------------- */
+  const [openFilters, setOpenFilters] = useState(false);
+
+  /* ------------------------ infinite-scroll demo ---------------------- */
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sentinel.current) return;
+    const ob = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !loading) {
+          /* Aquí podrías paginar → aumentar offset y refetch() */
+        }
+      },
+      { rootMargin: '600px' }
+    );
+    ob.observe(sentinel.current);
+    return () => ob.disconnect();
+  }, [loading]);
+
+  /* ----------------------- modal “añadir ítem” ------------------------ */
+  const [addOpen, setAddOpen] = useState(false);
+
+  /* -------------------------------------------------------------------- */
+  return (
+    <Container>
+      {/* ---------- botón abrir filtros (solo xs-sm) ---------- */}
+      <button onClick={() => setOpenFilters(true)} className="btn mb-4 md:hidden">
+        <Bars3Icon className="mr-2 h-5 w-5" />
+        Filtros
+      </button>
+
+      <div className="flex flex-col gap-10 md:flex-row">
+        {/* ---------- Filtros (off-canvas en móvil) ---------- */}
+        {/* Backdrop */}
+        <div
+          className={`
+            fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity md:hidden
+            ${openFilters ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+          `}
+          onClick={() => setOpenFilters(false)}
+        />
+
+        {/* Panel */}
+        <aside
+          className={`
+            fixed left-0 top-0 z-50 h-full w-72 bg-white p-6 shadow-xl transition-transform
+            md:static md:h-auto md:w-auto md:translate-x-0 md:bg-transparent md:shadow-none
+            ${openFilters ? 'translate-x-0' : '-translate-x-full'}
+          `}
+        >
+          {/* Cerrar (solo móvil) */}
+          <button onClick={() => setOpenFilters(false)} className="mb-4 md:hidden">
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+
+          <FiltersSidebar
+            value={filters}
+            onChange={setFilters}
+            onReset={() => setFilters({})}
+          />
+        </aside>
+
+        {/* -------------------- listado de tarjetas -------------------- */}
+        <section className="flex-1">
+          {/* CTA añadir producto (solo usuarios logueados) */}
+          {token && (
+            <div className="flex justify-end">
+              <button className="btn mb-4" onClick={() => setAddOpen(true)}>
+                Añadir producto
+              </button>
+            </div>
+          )}
+
+          {/* loader inicial */}
+          {loading && !items.length ? (
+            <GridSkeleton />
+          ) : (
+            <Grid>
+              {items.map(it => (
+                <ItemCard key={it.id} item={it} />
+              ))}
+              {/* sentinel infinite-scroll */}
+              <div ref={sentinel} />
+            </Grid>
+          )}
+
+          {/* vacío */}
+          {!loading && !items.length && (
+            <p className="py-6 text-center text-gray-500">No hay resultados.</p>
+          )}
+        </section>
+      </div>
+
+      {/* modal añadir */}
+      <AddItemModal open={addOpen} onClose={() => setAddOpen(false)} onCreated={refetch} />
+    </Container>
+  );
+}
+
+/* -------------------------------------------------- */
+/*                       Helpers                      */
+/* -------------------------------------------------- */
+
+/* Grid responsive: min-width 12 rem (≈192 px) y se
+   auto-ajusta con container-queries si el padre pasa
+   a ser un “container” — funciona también sin CQ. */
+const Grid = ({ children }: { children: React.ReactNode }) => (
+  <div
+    className="
+      grid gap-6 py-6 content-auto
+      @container lg:[grid-template-columns:repeat(auto-fill,minmax(14rem,1fr))]
+      [grid-template-columns:repeat(auto-fill,minmax(12rem,1fr))]
+    "
+  >
+    {children}
+  </div>
+);
+
+const GridSkeleton = () => (
+  <Grid>
+    {Array.from({ length: 8 }).map((_, i) => (
+      <SkeletonCard key={i} />
+    ))}
+  </Grid>
+);
+
+
+--- frontend/src/features/items/types.ts ---
+/**
+ * Modelos de dominio compartidos por todo el feature “items”.
+ * Se ajustan 1‑a‑1 a la respuesta JSON del micro‑servicio Catálogo.
+ */
+
+export type Category = {
+  id: number;
+  name: string;
+};
+
+/* ---- listado (GET /items/) ------------------------------------------ */
+export interface Item {
+  id: number;
+  name: string;
+  description?: string;
+  price_per_h: number;
+  available: boolean;
+
+  /* imágenes */
+  image_url?: string;   // compat. legacy
+  image_urls: string[]; // nuevas
+
+  categories: Category[];
+}
+
+/* ---- detalle (GET /items/{id}) -------------------------------------- */
+export interface ItemDetail extends Item {
+  compare_at_price?: number | null;
+  sku?: string | null;
+  stock: number;
+  weight_kg?: number | null;
+  shipping_type: 'free' | 'local_pickup' | 'paid';
+  condition: 'new' | 'used';
+  hashtags: string[];
+  owner_username: string;
+}
+
+
+--- frontend/src/features/items/add-product-modal/ModalShell.tsx ---
+import { Fragment, PropsWithChildren } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+
+type Props = PropsWithChildren<{
+  open: boolean;
+  title: string;
+  onClose(): void;
+}>;
+
+export default function ModalShell({ open, title, onClose, children }: Props) {
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="relative z-50">
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-md dark:bg-black/70" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 grid place-items-center p-4 sm:p-6">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="scale-95 opacity-0"
+            enterTo="scale-100 opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="scale-100 opacity-100"
+            leaveTo="scale-95 opacity-0"
+          >
+            <Dialog.Panel className="flex w-full max-w-lg sm:max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-800 dark:shadow-gray-900 transition-all">
+              <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+                <Dialog.Title className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {title}
+                </Dialog.Title>
+                <button
+                  type="button"
+                  className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-brand dark:text-gray-400 dark:hover:bg-gray-700"
+                  onClick={onClose}
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </header>
+
+              {children}
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/AddProductModal.tsx ---
+import { FormProvider, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import toast from 'react-hot-toast';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Fragment } from 'react';
+
+import { addProductSchema, AddProductFormData } from './schema';
+import ModalShell from './ModalShell';
+import BasicInfoSection from './sections/BasicInfoSection';
+import MediaSection from './sections/MediaSection';
+import PricingSection from './sections/PricingSection';
+import InventorySection from './sections/InventorySection';
+import ShippingSection from './sections/ShippingSection';
+
+import { api } from '../../../api';
+import { useAuth } from '../../../hooks/useAuth';
+
+type Props = {
+  open: boolean;
+  onClose(): void;
+  onCreated(): void;
+};
+
+export default function AddProductModal({ open, onClose, onCreated }: Props) {
+  const { token } = useAuth();
+
+  const methods = useForm<AddProductFormData>({
+    resolver: zodResolver(addProductSchema),
+    defaultValues: {
+      categories: [],
+      images: [],
+      condition: 'new',
+      hashtags: [],
+      stock: 1,
+      shipping_type: 'free'
+    }
+  });
+
+async function onSubmit(data: AddProductFormData) {
+  if (!token) {
+    toast.error('Debes haber iniciado sesión');
+    return;
+  }
+
+  try {
+    /* 1. Subir imágenes */
+    let image_urls: string[] = [];
+    if (data.images.length) {
+      const uploads = await Promise.all(
+        data.images.map(async img => {
+          const fd = new FormData();
+          fd.append('file', img);
+          const r = await api.post<{ url: string }>('/upload/', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          return r.data.url;
+        })
+      );
+      image_urls = uploads;
+    }
+
+    /* 2. Construir payload coherente con la API */
+    const payload = {
+      name: data.name,
+      description: data.description,
+      price_per_h: data.price,           // 👈 se mapea
+      compare_at_price: data.compare_at_price || undefined,
+      categories: data.categories.length ? data.categories : undefined,
+      image_urls,
+      sku: data.sku || undefined,
+      stock: data.stock,
+      weight_kg: data.weight_kg,
+      shipping_type: data.shipping_type,
+      condition: data.condition,
+      hashtags: data.hashtags.filter(Boolean)     // quita strings vacíos
+    };
+
+    await api.post('/items/', payload);
+
+    toast.success('¡Producto publicado!');
+    methods.reset();
+    onCreated();
+    onClose();
+  } catch (err: any) {
+    console.error(err);
+    toast.error(err.response?.data?.detail ?? 'Error al crear producto');
+  }
+}
+
+  return (
+    <ModalShell
+      open={open}
+      title="Nuevo producto"
+      onClose={() => {
+        methods.reset();
+        onClose();
+      }}
+    >
+      <FormProvider {...methods}>
+        <form
+          onSubmit={methods.handleSubmit(onSubmit)}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-8 overflow-y-auto px-6 py-8"
+        >
+          {/* Columna izquierda */}
+          <div className="space-y-10">
+            <BasicInfoSection />
+            <MediaSection />
+          </div>
+
+          {/* Columna derecha */}
+          <div className="space-y-10">
+            <PricingSection />
+            <InventorySection />
+            <ShippingSection />
+          </div>
+
+          {/* Footer */}
+          <div className="sm:col-span-2 flex justify-end gap-4 mt-6">
+            <button
+              type="button"
+              className="btn--ghost px-6 py-3 rounded-lg text-sm font-medium transition-all hover:shadow-md dark:hover:bg-gray-700"
+              onClick={() => {
+                methods.reset();
+                onClose();
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn px-6 py-3 rounded-lg text-sm font-medium flex items-center justify-center"
+              disabled={methods.formState.isSubmitting}
+            >
+              {methods.formState.isSubmitting ? (
+                <>
+                  <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
+                  Publicando…
+                </>
+              ) : (
+                'Publicar'
+              )}
+            </button>
+          </div>
+        </form>
+      </FormProvider>
+    </ModalShell>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/schema.ts ---
+import { z } from 'zod';
+
+const MB = 1024 * 1024;
+export const MAX_IMAGES = 10;
+
+export const priceRegex = /^\d+([.,]\d{1,2})?$/;
+
+export const addProductSchema = z.object({
+  // Información básica
+  name: z.string().min(3, 'Mínimo 3 caracteres'),
+  description: z.string().max(500).optional(),
+  categories: z.array(z.number()).min(1, 'Selecciona al menos una categoría'),
+  condition: z.enum(['new', 'used']),
+  hashtags: z.array(z.string()).max(5, 'Máx. 5 hashtags'),
+
+  // Media
+  images: z
+    .array(
+      z
+        .instanceof(File)
+        .refine(f => f.size <= 5 * MB, 'Cada imagen máx. 5 MB')
     )
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-
-
---- catalog/migrations/versions/20250714_0002_seed_default_categories.py ---
-"""Seed default categories
-
-Revision ID: 20250714_0002
-Revises: 20250713_0001
-Create Date: 2025‑07‑14 12:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-
-revision = "20250714_0002"
-down_revision = "20250713_0001"
-branch_labels = None
-depends_on = None
-
-DEFAULT_CATEGORIES = [
-    "Herramientas",
-    "Electrónica",
-    "Deportes",
-    "Hogar",
-    "Jardín",
-    "Fotografía",
-    "Camping",
-    "Infantil",
-]
-
-
-def upgrade() -> None:
-    categories = sa.table("categories", sa.column("name", sa.String))
-    conn = op.get_bind()
-
-    existing = {row.name for row in conn.execute(sa.select(categories.c.name))}
-    to_insert = [{"name": n} for n in DEFAULT_CATEGORIES if n not in existing]
-
-    if to_insert:
-        op.bulk_insert(categories, to_insert)
-
-
-def downgrade() -> None:
-    op.execute(
-        sa.text("DELETE FROM categories WHERE name = ANY(:names)"),
-        {"names": DEFAULT_CATEGORIES},
-    )
-
-
---- catalog/migrations/versions/20250713_0001_initial.py ---
-"""Initial schema
-
-Revision ID: 20250713_0001
-Revises:
-Create Date: 2025‑07‑13 12:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-
-# ──────────────────────────────
-revision = "20250713_0001"
-down_revision = None
-branch_labels = None
-depends_on = None
-# ──────────────────────────────
-
-def upgrade() -> None:
-    op.create_table(
-        "categories",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("name", sa.String, nullable=False, unique=True, index=True),
-    )
-
-    op.create_table(
-        "items",
-        sa.Column("id", sa.Integer, primary_key=True, index=True),
-        sa.Column("name", sa.String, nullable=False, index=True),
-        sa.Column("description", sa.String),
-        sa.Column("price_per_h", sa.Float, nullable=False),
-        sa.Column("image_url", sa.String),
-        sa.Column("owner_username", sa.String, nullable=False, index=True),
-        sa.Column("available", sa.Boolean, server_default=sa.text("true"), nullable=False),
-    )
-
-    op.create_table(
-        "item_images",
-        sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("item_id", sa.Integer, sa.ForeignKey("items.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("url", sa.String, nullable=False),
-    )
-
-    op.create_table(
-        "item_categories",
-        sa.Column("item_id", sa.Integer, sa.ForeignKey("items.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("category_id", sa.Integer, sa.ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True),
-    )
-
-
-def downgrade() -> None:
-    op.drop_table("item_categories")
-    op.drop_table("item_images")
-    op.drop_table("items")
-    op.drop_table("categories")
-
-
---- catalog/migrations/versions/20250715_0003_extend_items_with_details.py ---
-"""Amplía tabla items con campos avanzados
-
-Revision ID: 20250715_0003
-Revises    : 20250714_0002
-Create Date: 2025‑07‑15 09:00:00
-"""
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
-revision = "20250715_0003"
-down_revision = "20250714_0002"
-branch_labels = None
-depends_on = None
-
-
-def upgrade() -> None:
-    with op.batch_alter_table("items") as batch:
-        batch.add_column(sa.Column("compare_at_price", sa.Float))
-        batch.add_column(sa.Column("sku", sa.String(), unique=True))
-        batch.add_column(sa.Column("stock", sa.Integer(), nullable=False, server_default="1"))
-        batch.add_column(sa.Column("weight_kg", sa.Float))
-        batch.add_column(sa.Column("shipping_type", sa.String(length=20), nullable=False, server_default="free"))
-        batch.add_column(sa.Column("condition", sa.String(length=10), nullable=False, server_default="new"))
-        batch.add_column(sa.Column("hashtags", postgresql.ARRAY(sa.String)))
-
-
-def downgrade() -> None:
-    with op.batch_alter_table("items") as batch:
-        batch.drop_column("hashtags")
-        batch.drop_column("condition")
-        batch.drop_column("shipping_type")
-        batch.drop_column("weight_kg")
-        batch.drop_column("stock")
-        batch.drop_column("sku")
-        batch.drop_column("compare_at_price")
-
-
---- catalog/app/main.py ---
-# services/catalog/app/main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # MODIFIED: CORS
-
-from app.api import categories, items
-from app.models.database import Base, engine
-import app.models.models                         #  noqa: F401
-
-from app.core.config import settings  # MODIFIED: Para CORS
-
-app = FastAPI(
-    title="rental-mvp – Catalog Service",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
-
-# MODIFIED: CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.on_event("startup")
-def _init_db() -> None:
-    Base.metadata.create_all(bind=engine)
-
-@app.get("/health")
-def health():
-    return {"ok": True}
-
-app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
-app.include_router(items.router,      prefix="/api/items",      tags=["items"])
-
---- catalog/app/__init__.py ---
-
-
---- catalog/app/deps.py ---
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from sqlalchemy.orm import Session
-
-from app.models.database import SessionLocal
-from app.core.config import settings
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="dummy")  # no lo usamos, solo valida header
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def get_current_username(token: str = Depends(oauth2_scheme)) -> str:
-    """Devuelve `sub` del JWT emitido por Auth."""
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales no válidas",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str | None = payload.get("sub")
-        if not username:
-            raise cred_exc
-        return username
-    except JWTError as e:  # MODIFIED: Granular
-        detail = "Token expirado" if "exp" in str(e) else "Token inválido"
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail)
-
---- catalog/app/models/models.py ---
-from __future__ import annotations
-
-from typing import List
-from sqlalchemy import (
-    Boolean,
-    Column,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    Table,
-)
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ARRAY
-from .database import Base
-
-# relación N:M items–categories
-item_categories = Table(
-    "item_categories",
-    Base.metadata,
-    Column("item_id", Integer, ForeignKey("items.id", ondelete="CASCADE"), primary_key=True),
-    Column("category_id", Integer, ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True),
-)
-
-class ItemImage(Base):
-    __tablename__ = "item_images"
-
-    id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
-    url = Column(String, nullable=False)
-
-    item = relationship("Item", back_populates="images")
-
-
-class Category(Base):
-    __tablename__ = "categories"
-
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, index=True, nullable=False)
-
-    items = relationship("Item", secondary=item_categories, back_populates="categories")
-
-
-class Item(Base):
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True, nullable=False)
-    description = Column(String)
-    price_per_h = Column(Float, nullable=False)
-
-    compare_at_price = Column(Float)                            # 🆕
-    sku = Column(String, unique=True)                           # 🆕
-    stock = Column(Integer, default=1)                          # 🆕
-    weight_kg = Column(Float)                                   # 🆕
-    shipping_type = Column(String(20), default="free")          # 🆕 "free" | "local_pickup" | "paid"
-    condition = Column(String(10), default="new")               # 🆕 "new"  | "used"
-    hashtags = Column(ARRAY(String))                            # 🆕  TEXT[]
-
-    image_url = Column(String)           # destacado (legacy)
-    owner_username = Column(String, index=True, nullable=False)
-    available = Column(Boolean, default=True)
-
-    # relaciones
-    categories = relationship("Category", secondary=item_categories, back_populates="items")
-    images = relationship(
-        "ItemImage",
-        back_populates="item",
-        cascade="all, delete-orphan",
-        order_by="ItemImage.id",
-    )
-
-    # helper
-    @property
-    def image_urls(self) -> List[str]:
-        return [img.url for img in self.images]
-
---- catalog/app/models/__init__.py ---
-# importa modelos para que Alembic los detecte
-from .models import Category, Item, ItemImage  # noqa: F401
-
---- catalog/app/models/database.py ---
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-from app.core.config import settings
-
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, echo=True)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
---- catalog/app/schemas/category.py ---
-from pydantic import BaseModel, Field
-
-
-class CategoryBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=50)
-
-
-class CategoryCreate(CategoryBase):
-    pass
-
-
-class CategoryOut(CategoryBase):
-    id: int
-
-    class Config:
-        from_attributes = True
-
---- catalog/app/schemas/__init__.py ---
-from .category import CategoryCreate, CategoryOut
-from .item import ItemCreate, ItemUpdate, ItemOut
-
-__all__ = [
-    "CategoryCreate",
-    "CategoryOut",
-    "ItemCreate",
-    "ItemUpdate",
-    "ItemOut",
-]
-
---- catalog/app/schemas/item.py ---
-from __future__ import annotations
-from typing import List, Optional
-from pydantic import BaseModel, Field, PositiveFloat, AfterValidator, StringConstraints
-from typing_extensions import Annotated
-from pydantic import field_validator  
-from .category import CategoryOut
-
-# ─── validadores auxiliares ────────────────────────────────────────────
-def _check_url(v: str) -> str:
-    if v.startswith(("http://", "https://", "/")):
-        return v
-    raise ValueError("url debe ser http(s)://… o empezar por /uploads/…")
-
-UrlStr = Annotated[str, AfterValidator(_check_url)]
-Hashtag = Annotated[str, StringConstraints(pattern="^#[A-Za-z0-9_]{1,30}$")]
-
-# ─── BASE ──────────────────────────────────────────────────────────────
-class ItemBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=80)
-    description: Optional[str] = None
-    price_per_h: PositiveFloat
-    compare_at_price: Optional[PositiveFloat] = None
-    sku: Optional[str] = Field(None, max_length=40)
-    stock: int = Field(1, ge=0)
-    weight_kg: Optional[PositiveFloat] = None
-    shipping_type: str = Field("free", pattern="^(free|local_pickup|paid)$")
-    condition: str = Field("new", pattern="^(new|used)$")
-
-    # ── ⚠️ el problema estaba aquí ─────────────────────────
-    hashtags: List[Hashtag] = Field(default_factory=list, max_items=5)
-
-    # ⬇️ normaliza None → []
-    @field_validator("hashtags", mode="before")
-    @classmethod
-    def _none_to_list(cls, v):
-        # Pydantic llama al validador antes de validar tipos ⇒
-        # si viene None devolvemos lista vacía
-        return v or []
-
-
-# ─── CREATE ────────────────────────────────────────────────────────────
-class ItemCreate(ItemBase):
-    image_urls: List[UrlStr] = Field(..., min_length=1, max_length=10)
-    categories: Optional[List[int]] = Field(
-        default=None, description="IDs de categorías asociadas"
-    )
-
-# ─── UPDATE ────────────────────────────────────────────────────────────
-class ItemUpdate(BaseModel):
-    # todos opcionales
-    name: Optional[str] = Field(None, min_length=1, max_length=80)
-    description: Optional[str] = None
-    price_per_h: Optional[PositiveFloat] = None
-    compare_at_price: Optional[PositiveFloat] = None
-    sku: Optional[str] = Field(None, max_length=40)
-    stock: Optional[int] = Field(None, ge=0)
-    weight_kg: Optional[PositiveFloat] = None
-    shipping_type: Optional[str] = Field(None, pattern="^(free|local_pickup|paid)$")
-    condition: Optional[str] = Field(None, pattern="^(new|used)$")
-    hashtags: Optional[List[Hashtag]] = Field(default=None, max_items=5)
-    image_urls: Optional[List[UrlStr]] = Field(None, min_items=1, max_items=10)
-    categories: Optional[List[int]] = None
-
-    model_config = {"extra": "forbid"}
-
-# ─── OUT ───────────────────────────────────────────────────────────────
-class ItemOut(ItemBase):
-    id: int
-    available: bool
-    owner_username: str
-    categories: List[CategoryOut]
-    image_urls: List[UrlStr]
-    image_url: Optional[UrlStr] = None  # compat
-
-    model_config = {"from_attributes": True}
-
-
---- catalog/app/crud/category.py ---
-from typing import List, Optional
-
-from sqlalchemy.orm import Session
-
-from app.models.models import Category
-from app.schemas.category import CategoryCreate
-
-
-def get_category(db: Session, cat_id: int) -> Optional[Category]:
-    return db.query(Category).filter(Category.id == cat_id).first()
-
-
-def get_categories(db: Session) -> List[Category]:
-    return db.query(Category).order_by(Category.name).all()
-
-
-def create_category(db: Session, cat_in: CategoryCreate) -> Category:
-    db_cat = Category(**cat_in.model_dump())
-    db.add(db_cat)
-    db.commit()
-    db.refresh(db_cat)
-    return db_cat
-
---- catalog/app/crud/__init__.py ---
-from .category import get_category, get_categories, create_category           # noqa: F401
-from .item import (                                                           # noqa: F401
-    get_item,
-    get_items,
-    get_items_by_owner,
-    create_item,
-    update_item,
-    delete_item,
-)
-
-__all__ = [
-    "get_category",
-    "get_categories",
-    "create_category",
-    "get_item",
-    "get_items",
-    "get_items_by_owner",
-    "create_item",
-    "update_item",
-    "delete_item",
-]
-
---- catalog/app/crud/item.py ---
-from __future__ import annotations
-
-from typing import List, Optional, Tuple
-
-from sqlalchemy import asc, desc, or_
-from sqlalchemy.orm import Session, joinedload
-
-from app.models.models import Category, Item, ItemImage
-from app.schemas.item import ItemCreate, ItemUpdate
-
-# ───────── helpers internos ───────────────────────────────────────────────
-def _get_categories_or_400(db: Session, ids: list[int]) -> list[Category]:
-    cats = db.query(Category).filter(Category.id.in_(ids)).all()
-    if len(cats) != len(ids):
-        missing = set(ids) - {c.id for c in cats}
-        raise ValueError(f"Categorías inexistentes: {', '.join(map(str, missing))}")
-    return cats
-
-
-def _apply_order(q, order_by: str | None, order_dir: str | None):
-    mapping = {"price": Item.price_per_h, "name": Item.name, "id": Item.id}
-    if not order_by:
-        return q.order_by(Item.id)
-    col = mapping.get(order_by, Item.id)
-    return q.order_by(asc(col) if order_dir == "asc" else desc(col))
-
-
-# ───────── lectura ────────────────────────────────────────────────────────
-def get_item(db: Session, item_id: int) -> Optional[Item]:
+    .min(1, 'Al menos 1 imagen')
+    .max(MAX_IMAGES, `Máx. ${MAX_IMAGES} imágenes`),
+
+  // Pricing
+  price: z
+    .string()
+    .regex(priceRegex, 'Precio inválido')
+    .transform(v => Number(v.replace(',', '.'))),
+  compare_at_price: z
+    .string()
+    .regex(priceRegex, 'Precio inválido')
+    .transform(v => (v ? Number(v.replace(',', '.')) : undefined))
+    .optional(),
+
+  // Inventory
+  sku: z.string().max(40).optional(),
+  stock: z.number().int().min(0).default(1),
+
+  // Shipping
+  weight_kg: z
+    .string()
+    .regex(priceRegex, 'Número inválido')
+    .transform(v => Number(v.replace(',', '.'))),
+  shipping_type: z.enum(['free', 'local_pickup', 'paid'])
+});
+
+export type AddProductFormData = z.infer<typeof addProductSchema>;
+
+
+--- frontend/src/features/items/add-product-modal/hooks/useImagePreviews.ts ---
+import { useEffect, useState } from 'react';
+
+export default function useImagePreviews(files: File[]) {
+  const [previews, setPreviews] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!files.length) {
+      setPreviews([]);
+      return;
+    }
+    const urls = files.map(f => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach(URL.revokeObjectURL);
+  }, [files]);
+
+  return previews;
+}
+
+
+--- frontend/src/features/items/add-product-modal/sections/ShippingSection.tsx ---
+import { useFormContext } from 'react-hook-form';
+
+export default function ShippingSection() {
+  const { register, formState: { errors } } = useFormContext();
+
+  return (
+    <section className="space-y-6">
+      {/* Peso */}
+      <div className="relative">
+        <input
+          {...register('weight_kg')}
+          id="weight"
+          placeholder="Peso (kg)"
+          inputMode="decimal"
+          className="peer form-input w-full rounded-lg border-gray-300 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <label
+          htmlFor="weight"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Peso (kg)
+        </label>
+        {errors.weight_kg && <p className="form-error">{errors.weight_kg.message}</p>}
+      </div>
+
+      {/* Tipo envío */}
+      <div>
+        <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Tipo de envío
+        </label>
+        <select
+          {...register('shipping_type')}
+          className="form-select w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700"
+        >
+          <option value="free">Envío gratis</option>
+          <option value="local_pickup">Recogida local</option>
+          <option value="paid">Envío pagado</option>
+        </select>
+        {errors.shipping_type && <p className="form-error">{errors.shipping_type.message}</p>}
+      </div>
+    </section>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/sections/MediaSection.tsx ---
+import { PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useFormContext } from 'react-hook-form';
+import { MAX_IMAGES } from '../schema';
+import useImagePreviews from '../hooks/useImagePreviews';
+
+export default function MediaSection() {
+  const { watch, setValue, formState: { errors } } = useFormContext();
+  const files: File[] = watch('images') || [];
+  const previews = useImagePreviews(files);
+
+  return (
+    <section className="space-y-4">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        Imágenes ({files.length}/{MAX_IMAGES})
+      </label>
+
+      {/* Zona de drop */}
+      <label className="drop-zone">
+        <PhotoIcon className="h-10 w-10 mb-2" />
+        <span className="font-medium">Haz clic o arrastra archivos aquí</span>
+        <span className="text-xs mt-1">PNG/JPG · máx. 5 MB · hasta {MAX_IMAGES}</span>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          onChange={e =>
+            setValue('images', [...(e.target.files ?? [])] as File[], { shouldValidate: true })
+          }
+        />
+      </label>
+
+      {/* Previews */}
+      {!!previews.length && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {previews.map((src, i) => (
+            <div key={i} className="relative group">
+              <img
+                src={src}
+                alt={`preview-${i}`}
+                className="h-28 w-full rounded-lg object-cover transition-transform group-hover:scale-105"
+              />
+              <button
+                type="button"
+                title="Eliminar"
+                onClick={() => {
+                  const copy = [...files];
+                  copy.splice(i, 1);
+                  setValue('images', copy, { shouldValidate: true });
+                }}
+                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                <TrashIcon className="h-8 w-8 text-white" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {errors.images && <p className="form-error">{errors.images.message as string}</p>}
+    </section>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/sections/BasicInfoSection.tsx ---
+import { useFormContext } from 'react-hook-form';
+import Chip from '../components/Chip';
+import useCategories, { Category } from '../../../categories/useCategories';
+
+export default function BasicInfoSection() {
+  const { data: cats } = useCategories();
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors }
+  } = useFormContext();
+
+  return (
+    <section className="space-y-6">
+      {/* Nombre */}
+      <div className="relative">
+        <input
+          {...register('name')}
+          id="name"
+          placeholder="Nombre del producto"
+          className="peer form-input w-full rounded-lg border-gray-300 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <label
+          htmlFor="name"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Nombre
+        </label>
+        {errors.name && <p className="form-error">{errors.name.message}</p>}
+      </div>
+
+      {/* Descripción */}
+      <div className="relative">
+        <textarea
+          {...register('description')}
+          id="description"
+          rows={4}
+          placeholder="Descripción detallada"
+          className="peer form-input w-full resize-y rounded-lg border-gray-300 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <label
+          htmlFor="description"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Descripción
+        </label>
+        <span className="absolute bottom-2 right-3 text-xs text-gray-400">
+          {watch('description')?.length ?? 0}/500
+        </span>
+        {errors.description && <p className="form-error">{errors.description.message}</p>}
+      </div>
+
+      {/* Categorías */}
+      <div>
+        <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Categorías</p>
+        <div className="flex flex-wrap gap-2">
+          {cats.map((c: Category) => {
+            const selected = watch('categories').includes(c.id);
+            return (
+              <Chip
+                key={c.id}
+                selected={selected}
+                onClick={() => {
+                  const current = new Set(watch('categories'));
+                  selected ? current.delete(c.id) : current.add(c.id);
+                  setValue('categories', [...current]);
+                }}
+              >
+                {c.name}
+              </Chip>
+            );
+          })}
+        </div>
+        {errors.categories && <p className="form-error">{errors.categories.message}</p>}
+      </div>
+
+      {/* Estado */}
+      <div>
+        <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+          Estado
+        </label>
+        <select
+          {...register('condition')}
+          className="form-select w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700"
+        >
+          <option value="new">Nuevo</option>
+          <option value="used">Usado</option>
+        </select>
+        {errors.condition && <p className="form-error">{errors.condition.message}</p>}
+      </div>
+    </section>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/sections/PricingSection.tsx ---
+import { useFormContext } from 'react-hook-form';
+
+export default function PricingSection() {
+  const { register, formState: { errors } } = useFormContext();
+
+  return (
+    <section className="space-y-6">
+      {/* Precio */}
+      <div className="relative">
+        <input
+          {...register('price')}
+          id="price"
+          placeholder="Precio"
+          inputMode="decimal"
+          className="peer form-input w-full rounded-lg border-gray-300 pl-8 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+          €
+        </span>
+        <label
+          htmlFor="price"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Precio
+        </label>
+        {errors.price && <p className="form-error">{errors.price.message}</p>}
+      </div>
+
+      {/* Precio comparado */}
+      <div className="relative">
+        <input
+          {...register('compare_at_price')}
+          id="compare"
+          placeholder="Precio anterior (opcional)"
+          inputMode="decimal"
+          className="peer form-input w-full rounded-lg border-gray-300 pl-8 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
+          €
+        </span>
+        <label
+          htmlFor="compare"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Precio anterior
+        </label>
+        {errors.compare_at_price && <p className="form-error">{errors.compare_at_price.message}</p>}
+      </div>
+    </section>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/sections/InventorySection.tsx ---
+import { useFormContext } from 'react-hook-form';
+
+export default function InventorySection() {
+  const { register, formState: { errors } } = useFormContext();
+
+  return (
+    <section className="space-y-6">
+      {/* SKU */}
+      <div className="relative">
+        <input
+          {...register('sku')}
+          id="sku"
+          placeholder="SKU (opcional)"
+          className="peer form-input w-full rounded-lg border-gray-300 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <label
+          htmlFor="sku"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          SKU
+        </label>
+        {errors.sku && <p className="form-error">{errors.sku.message}</p>}
+      </div>
+
+      {/* Stock */}
+      <div className="relative">
+        <input
+          {...register('stock', { valueAsNumber: true })}
+          id="stock"
+          placeholder="Stock disponible"
+          type="number"
+          min={0}
+          className="peer form-input w-full rounded-lg border-gray-300 placeholder-transparent focus:border-brand focus:ring-brand dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand"
+        />
+        <label
+          htmlFor="stock"
+          className="form-floating-label peer-placeholder-shown:form-floating-label--placeholder dark:bg-gray-800"
+        >
+          Stock
+        </label>
+        {errors.stock && <p className="form-error">{errors.stock.message}</p>}
+      </div>
+    </section>
+  );
+}
+
+
+--- frontend/src/features/items/add-product-modal/components/Chip.tsx ---
+import clsx from 'clsx';
+import { PropsWithChildren } from 'react';
+
+type Props = PropsWithChildren<{
+  selected?: boolean;
+  onClick: () => void;
+}>;
+
+export default function Chip({ selected, onClick, children }: Props) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-full px-4 py-1 text-sm font-medium transition-all',
+        selected
+          ? 'bg-brand text-white shadow-md hover:shadow-lg'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/ItemDetailModal.tsx ---
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+
+import useItem from './hooks/useItem';
+import ModalShell from '../add-product-modal/ModalShell';
+import Skeleton from './components/Skeleton';
+import ImageGallery from './components/ImageGallery';
+import PriceBlock from './components/PriceBlock';
+import CategoryChips from './components/CategoryChips';
+import HashtagList from './components/HashtagList';
+import InfoGrid from './components/InfoGrid';
+import OwnerBanner from './components/OwnerBanner';
+
+type Props = {
+  open: boolean;
+  itemId: number | null;
+  onClose(): void;
+};
+
+export default function ItemDetailModal({ open, itemId, onClose }: Props) {
+  const { data, isLoading } = useItem(itemId);
+
+  return (
+    <ModalShell open={open} title={data?.name ?? 'Cargando…'} onClose={onClose}>
+      <div className="p-6 overflow-y-auto max-h-[90vh]">
+        {isLoading || !data ? (
+          <Skeleton />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Galería */}
+            <ImageGallery urls={data.image_urls} />
+
+            {/* Columna derecha */}
+            <div className="space-y-6">
+              <PriceBlock
+                price={data.price_per_h}
+                compare={data.compare_at_price}
+                stock={data.stock}
+              />
+
+              <CategoryChips cats={data.categories} />
+              <HashtagList tags={data.hashtags} />
+
+              <p className="prose max-w-none dark:prose-invert">{data.description}</p>
+
+              <InfoGrid item={data} />
+
+              <OwnerBanner owner={data.owner_username} />
+
+              <button className="btn w-full md:w-auto">Contactar vendedor</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/ProductDetailModal.tsx ---
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import {
+  XMarkIcon,
+  ArrowPathIcon,
+  HeartIcon,
+  ShareIcon,
+} from '@heroicons/react/24/outline';
+import clsx from 'clsx';
+
+import ImageGallery from './components/ImageGallery';
+import PriceBlock from './components/PriceBlock';
+import InfoGrid from './components/InfoGrid';
+import CategoryChips from './components/CategoryChips';
+import HashtagList from './components/HashtagList';
+import OwnerBanner from './components/OwnerBanner';
+import useItem from './hooks/useItem';
+import { useAuth } from '../../../hooks/useAuth';
+
+type Props = {
+  itemId: number | null;
+  open: boolean;
+  onClose(): void;
+};
+
+export default function ProductDetailModal({ itemId, open, onClose }: Props) {
+  const { data, isLoading } = useItem(itemId);
+  const { token } = useAuth();
+
+  /* ---------- placeholder mientras carga ---------- */
+  if (isLoading || !data) {
     return (
-        db.query(Item)
-        .options(joinedload(Item.categories), joinedload(Item.images))
-        .filter(Item.id == item_id)
-        .first()
-    )
+      <SkeletonShell open={open} onClose={onClose} />
+    );
+  }
+
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog
+        onClose={onClose}
+        className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 lg:p-10"
+      >
+        {/* BACKDROP */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+        </Transition.Child>
+
+        {/* PANEL */}
+        <div className="relative mx-auto flex w-full max-w-5xl">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="translate-y-8 sm:translate-y-0 sm:scale-95 opacity-0"
+            enterTo="translate-y-0 sm:scale-100 opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="translate-y-0 sm:scale-100 opacity-100"
+            leaveTo="translate-y-8 sm:translate-y-0 sm:scale-95 opacity-0"
+          >
+            <Dialog.Panel className="relative grid w-full overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-gray-800 md:grid-cols-2">
+              {/* ---------- GALERÍA ---------- */}
+              <ImageGallery urls={data.image_urls} />
+
+              {/* ---------- INFO ---------- */}
+              <div className="flex flex-col gap-6 p-6 md:p-10">
+                {/* header móvil */}
+                <div className="flex items-start justify-between md:hidden">
+                  <h2 className="text-xl font-semibold">{data.name}</h2>
+                  <CloseBtn onClose={onClose} />
+                </div>
+
+                {/* breadcrumb opcional */}
+                <CategoryChips cats={data.categories} />
+
+                {/* nombre + acciones */}
+                <div className="flex items-start justify-between">
+                  <h1 className="hidden text-2xl font-bold md:block">
+                    {data.name}
+                  </h1>
+
+                  {/* acciones like / share (solo usuarios) */}
+                  {token && (
+                    <div className="flex gap-2">
+                      <IconBtn title="Favorito">
+                        <HeartIcon className="h-5 w-5" />
+                      </IconBtn>
+                      <IconBtn title="Compartir">
+                        <ShareIcon className="h-5 w-5" />
+                      </IconBtn>
+                    </div>
+                  )}
+                </div>
+
+                {/* price + stock */}
+                <PriceBlock
+                  price={data.price_per_h}
+                  compare={data.compare_at_price}
+                  stock={data.stock}
+                />
+
+                {/* descripción */}
+                {!!data.description && (
+                  <p className="prose max-w-none text-gray-700 dark:prose-invert">
+                    {data.description}
+                  </p>
+                )}
+
+                {/* hashtags */}
+                <HashtagList tags={data.hashtags} />
+
+                {/* tabla atributos */}
+                <InfoGrid item={data} />
+
+                {/* banner propietario */}
+                <OwnerBanner owner={data.owner_username} />
+
+                {/* CTA reservar / contactar */}
+                <div className="mt-auto flex flex-col gap-3 sm:flex-row">
+                  <button className="btn flex-1">Reservar ahora</button>
+                  <button className="btn--ghost flex-1">Contactar</button>
+                </div>
+              </div>
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+/* ---------- Helpers ---------- */
+
+function SkeletonShell({ open, onClose }: { open: boolean; onClose(): void }) {
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="fixed inset-0 z-50 grid place-items-center p-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        <div className="h-[70vh] w-full max-w-5xl animate-pulse rounded-3xl bg-white/70 dark:bg-gray-700/70" />
+      </Dialog>
+    </Transition>
+  );
+}
+
+function CloseBtn({ onClose }: { onClose(): void }) {
+  return (
+    <button
+      onClick={onClose}
+      className="rounded-full p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+      aria-label="Cerrar"
+    >
+      <XMarkIcon className="h-6 w-6" />
+    </button>
+  );
+}
+
+function IconBtn({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      className="rounded-full border p-2 text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+    >
+      {children}
+    </button>
+  );
+}
 
 
-def _build_query(
-    db: Session,
-    *,
-    name: Optional[str],
-    min_price: Optional[float],
-    max_price: Optional[float],
-    available: Optional[bool],
-    categories: Optional[List[int]],
-    order_by: Optional[str],
-    order_dir: Optional[str],
-):
-    q = db.query(Item).options(joinedload(Item.categories), joinedload(Item.images))
+--- frontend/src/features/items/item-detail/hooks/useItem.ts ---
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../../../../api';
+import type { ItemDetail } from '../../types';
 
-    if name:
-        pattern = f"%{name}%"
-        q = q.filter(or_(Item.name.ilike(pattern), Item.description.ilike(pattern)))
-    if min_price is not None:
-        q = q.filter(Item.price_per_h >= min_price)
-    if max_price is not None:
-        q = q.filter(Item.price_per_h <= max_price)
-    if available is not None:
-        q = q.filter(Item.available == available)
-    if categories:
-        q = q.filter(Item.categories.any(Category.id.in_(categories)))
-
-    return _apply_order(q, order_by, order_dir)
+/**
+ * Obtiene los datos completos de un ítem por ID.
+ * Se usa dentro del modal de detalle.
+ */
+export default function useItem(itemId: number | null) {
+  return useQuery<ItemDetail>({
+    queryKey: ['item', itemId],
+    enabled: !!itemId,
+    queryFn: () => api.get<ItemDetail>(`/items/${itemId}`).then(r => r.data),
+    staleTime: 60_000
+  });
+}
 
 
-def get_items(
-    db: Session,
-    skip: int,
-    limit: int,
-    *,
-    name: Optional[str],
-    min_price: Optional[float],
-    max_price: Optional[float],
-    available: Optional[bool],
-    categories: Optional[List[int]],
-    order_by: Optional[str],
-    order_dir: Optional[str],
-) -> Tuple[List[Item], int]:
-    q = _build_query(
-        db,
-        name=name,
-        min_price=min_price,
-        max_price=max_price,
-        available=available,
-        categories=categories,
-        order_by=order_by,
-        order_dir=order_dir,
-    )
-    total = q.count()
-    items = q.offset(skip).limit(limit).all()
-    return items, total
+--- frontend/src/features/items/item-detail/components/StockBadge.tsx ---
+type Props = { stock: number };
+
+export default function StockBadge({ stock }: Props) {
+  const color = stock === 0 ? 'bg-red-600' : stock < 5 ? 'bg-amber-500' : 'bg-emerald-600';
+  const label = stock === 0 ? 'Sin stock' : stock < 5 ? 'Quedan pocas unidades' : 'En stock';
+
+  return (
+    <span className={`inline-flex items-center rounded-full px-3 py-0.5 text-xs font-semibold text-white ${color}`}>
+      {label}
+    </span>
+  );
+}
 
 
-def get_items_by_owner(db: Session, owner: str) -> List[Item]:
+--- frontend/src/features/items/item-detail/components/CategoryChips.tsx ---
+import Chip from '../../add-product-modal/components/Chip';
+
+type Cat = { id: number; name: string };
+
+export default function CategoryChips({ cats }: { cats: Cat[] }) {
+  if (!cats.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {cats.map(c => (
+        <Chip key={c.id} onClick={() => null}>
+          {c.name}
+        </Chip>
+      ))}
+    </div>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/components/OwnerBanner.tsx ---
+export default function OwnerBanner({ owner }: { owner: string }) {
+  return (
+    <p className="text-xs text-gray-500">
+      Publicado por <span className="font-medium">@{owner}</span>
+    </p>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/components/InfoGrid.tsx ---
+import type { ItemDetail } from '../../types';
+
+export default function InfoGrid({ item }: { item: ItemDetail }) {
+  const rows = [
+    ['SKU', item.sku ?? '—'],
+    ['Peso (kg)', item.weight_kg?.toFixed(2) ?? '—'],
+    [
+      'Tipo de envío',
+      { free: 'Envío gratis', local_pickup: 'Recogida local', paid: 'Envío pagado' }[
+        item.shipping_type
+      ]
+    ],
+    ['Condición', item.condition === 'new' ? 'Nuevo' : 'Usado']
+  ];
+
+  return (
+    <table className="w-full text-sm text-gray-600 dark:text-gray-300">
+      <tbody>
+        {rows.map(([k, v]) => (
+          <tr key={k as string} className="border-t border-gray-200 dark:border-gray-700">
+            <th className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-400">{k}</th>
+            <td className="py-2">{v}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/components/HashtagList.tsx ---
+export default function HashtagList({ tags }: { tags: string[] }) {
+  if (!tags.length) return null;
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {tags.map(t => (
+        <li key={t} className="text-sm text-sky-700 dark:text-sky-400">#{t.replace(/^#/, '')}</li>
+      ))}
+    </ul>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/components/PriceBlock.tsx ---
+import StockBadge from './StockBadge';
+
+type Props = {
+  price: number;
+  compare?: number | null;
+  stock: number;
+};
+
+export default function PriceBlock({ price, compare, stock }: Props) {
+  const hasDiscount = compare && compare > price;
+  const discount = hasDiscount ? Math.round(((compare - price) / compare) * 100) : 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-extrabold text-brand">
+          €{price.toFixed(2)}
+        </span>
+        <span className="text-xs text-gray-500">/ h</span>
+        {hasDiscount && (
+          <>
+            <span className="text-lg line-through text-gray-400">
+              €{compare!.toFixed(2)}
+            </span>
+            <span className="badge badge--danger">–{discount}%</span>
+          </>
+        )}
+      </div>
+      <StockBadge stock={stock} />
+    </div>
+  );
+}
+
+
+
+--- frontend/src/features/items/item-detail/components/Skeleton.tsx ---
+export default function Skeleton() {
+  return (
+    <div className="animate-pulse grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="h-80 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+      <div className="space-y-4">
+        <div className="h-8 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-6 w-1/3 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+    </div>
+  );
+}
+
+
+--- frontend/src/features/items/item-detail/components/ImageGallery.tsx ---
+import { useState } from 'react';
+import { useSwipeable } from 'react-swipeable';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import clsx from 'clsx';
+
+export default function ImageGallery({ urls }: { urls: string[] }) {
+  const [idx, setIdx] = useState(0);
+  const total = urls.length;
+
+  const handlers = useSwipeable({
+    onSwipedLeft: () => next(),
+    onSwipedRight: () => prev(),
+    trackMouse: true,
+  });
+
+  function next() {
+    setIdx((i) => (i + 1) % total);
+  }
+  function prev() {
+    setIdx((i) => (i - 1 + total) % total);
+  }
+
+  return (
+    <div {...handlers} className="flex flex-col gap-4 bg-gray-50 dark:bg-gray-700">
+      {/* main */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden">
+        <img
+          key={idx}
+          src={urls[idx]}
+          alt={`Imagen ${idx + 1}`}
+          className="h-full w-full object-cover transition-all duration-500 ease-out scale-105 opacity-0 animate-[fadeIn_.6s_forwards]"
+        />
+
+        {total > 1 && (
+          <>
+            <NavBtn pos="left" onClick={prev} />
+            <NavBtn pos="right" onClick={next} />
+          </>
+        )}
+      </div>
+
+      {/* thumbs */}
+      {total > 1 && (
+        <div className="flex gap-2 overflow-x-auto px-2 pb-2">
+          {urls.map((u, i) => (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              aria-label={`Miniatura ${i + 1}`}
+              className={clsx(
+                'relative aspect-square h-16 overflow-hidden rounded-lg',
+                i === idx && 'ring-2 ring-brand'
+              )}
+            >
+              <img src={u} alt="" className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavBtn({
+  pos,
+  onClick,
+}: {
+  pos: 'left' | 'right';
+  onClick(): void;
+}) {
+  const Icon = pos === 'left' ? ChevronLeftIcon : ChevronRightIcon;
+  return (
+    <button
+      onClick={onClick}
+      className={clsx(
+        'group absolute top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white',
+        pos === 'left' ? 'left-2' : 'right-2'
+      )}
+    >
+      <Icon className="h-6 w-6 group-hover:scale-110 transition-transform" />
+    </button>
+  );
+}
+
+
+--- frontend/src/features/rentals/reserve.ts ---
+/**
+ * Orquesta todo el flujo:
+ *   1) crea un alquiler              → /api/rentals/
+ *   2) pide PaymentIntent a Stripe   → /api/payments/create-intent
+ * Devuelve el `client_secret` para confirmar el pago desde el front.
+ */
+import { api } from "../../api";
+
+// ### UPDATED: Acepta fechas reales
+export async function reserve(item_id: number, start: Date, end: Date) {
+  const start_at = start.toISOString();
+  const end_at = end.toISOString();
+
+  // 1) crear alquiler con fechas
+  const { data: rental } = await api.post("/rentals/", {
+    item_id,
+    start_at,
+    end_at
+  });
+
+  // 2) crear PaymentIntent (fianza = rental.deposit)
+  const { data: intent } = await api.post("/payments/create-intent", {
+    amount: rental.deposit
+  });
+
+  return { clientSecret: intent.client_secret, rental };
+}
+
+--- frontend/src/features/rentals/RentalList.tsx ---
+// src/features/rentals/RentalList.tsx
+import { useAuth } from "../../hooks/useAuth";
+import { useRentals, RentalStatus } from "./useRentals";
+import clsx from "clsx";
+
+/* ------------------------------------------------------------------ */
+/*                         Helper visual                              */
+/* ------------------------------------------------------------------ */
+function statusLabel(s: RentalStatus) {
+  switch (s) {
+    case "pending":
+      return ["Pendiente", "badge badge--danger"];
+    case "confirmed":
+      return ["Confirmado", "badge badge--ok"];
+    case "returned":
+      return ["Devuelto", "badge"];
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*                           Componente                               */
+/* ------------------------------------------------------------------ */
+export default function RentalList() {
+  const { token } = useAuth();
+  const {
+    data: rentals,
+    loading,
+  } = useRentals(token); // ← hook actualizado
+
+  if (!token)
     return (
-        db.query(Item)
-        .options(joinedload(Item.categories), joinedload(Item.images))
-        .filter(Item.owner_username == owner)
-        .all()
-    )
-
-
-# ───────── escritura ──────────────────────────────────────────────────────
-def create_item(db: Session, item_in: ItemCreate, owner_username: str) -> Item:
-    main = str(item_in.image_urls[0])
-
-    db_item = Item(
-        name=item_in.name,
-        description=item_in.description,
-        price_per_h=item_in.price_per_h,
-        compare_at_price=item_in.compare_at_price,
-        sku=item_in.sku,
-        stock=item_in.stock,
-        weight_kg=item_in.weight_kg,
-        shipping_type=item_in.shipping_type,
-        condition=item_in.condition,
-        hashtags=item_in.hashtags,
-        image_url=main,
-        owner_username=owner_username,
-    )
-
-    if item_in.categories:
-        db_item.categories = _get_categories_or_400(db, item_in.categories)
-
-    db_item.images = [ItemImage(url=str(u)) for u in item_in.image_urls]
-
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-
-def update_item(db: Session, db_item: Item, item_in: ItemUpdate) -> Item:
-    data = item_in.model_dump(
-        exclude_unset=True, exclude={"categories", "image_urls"}
-    )
-    for k, v in data.items():
-        setattr(db_item, k, v)
-
-    if item_in.categories is not None:
-        db_item.categories = _get_categories_or_400(db, item_in.categories)
-
-    if item_in.image_urls is not None:
-        db_item.image_url = str(item_in.image_urls[0])
-        db_item.images = [ItemImage(url=str(u)) for u in item_in.image_urls]
-
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-
-def delete_item(db: Session, db_item: Item) -> None:
-    db.delete(db_item)
-    db.commit()
-
---- catalog/app/core/__init__.py ---
-
-
---- catalog/app/core/config.py ---
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class Settings(BaseSettings):
-    FRONTEND_URL: str | None = None  # MODIFIED: Optional
-    DATABASE_URL: str
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
-
-settings = Settings()
-
---- catalog/app/api/items.py ---
-from typing import List, Optional
-from urllib.parse import urlencode
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    Response,
-    status,
-)
-from sqlalchemy.orm import Session
-
-from app import crud, schemas
-from app.deps import get_db, get_current_username
-
-router = APIRouter()
-
-# ───────── helpers paginación RFC-5988 ────────────────────────────────────
-def _pagination_links(request: Request, skip: int, limit: int, total: int, **flt):
-    links: list[str] = []
-    base = request.url.remove_query_params("skip").remove_query_params("limit")
-
-    def _url(new_skip: int):
-        params = {k: v for k, v in flt.items() if v is not None}
-        params.update({"skip": new_skip, "limit": limit})
-        return f"<{base}?{urlencode(params, doseq=True)}>"
-
-    if skip + limit < total:
-        links.append(f'{_url(skip + limit)}; rel="next"')
-    if skip > 0:
-        links.append(f'{_url(max(skip - limit,0))}; rel="prev"')
-    return ", ".join(links)
-
-
-# ───────────── crear ─────────────────────────────────────────────────────
-@router.post("/", response_model=schemas.ItemOut, status_code=status.HTTP_201_CREATED)
-def create_item(
-    item_in: schemas.ItemCreate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    return crud.create_item(db, item_in, owner_username=username)
-
-
-# ───────────── listar público ────────────────────────────────────────────
-@router.get("/", response_model=List[schemas.ItemOut])
-def list_items(
-    request: Request,
-    response: Response,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    name: Optional[str] = None,
-    min_price: Optional[float] = Query(None, ge=0),
-    max_price: Optional[float] = Query(None, ge=0),
-    available: Optional[bool] = None,
-    categories: Optional[List[int]] = Query(None),
-    order_by: Optional[str] = Query(None, pattern="^(price|name|id)$"),
-    order_dir: Optional[str] = Query(None, pattern="^(asc|desc)$"),
-    db: Session = Depends(get_db),
-):
-    items, total = crud.get_items(
-        db,
-        skip,
-        limit,
-        name=name,
-        min_price=min_price,
-        max_price=max_price,
-        available=available,
-        categories=categories,
-        order_by=order_by,
-        order_dir=order_dir,
-    )
-    response.headers["X-Total-Count"] = str(total)
-    if total:
-        link = _pagination_links(
-            request,
-            skip,
-            limit,
-            total,
-            name=name,
-            min_price=min_price,
-            max_price=max_price,
-            available=available,
-            categories=categories,
-            order_by=order_by,
-            order_dir=order_dir,
-        )
-        if link:
-            response.headers["Link"] = link
-    return items
-
-
-# ───────────── mis ítems ────────────────────────────────────────────────
-@router.get("/me", response_model=List[schemas.ItemOut])
-def my_items(
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    return crud.get_items_by_owner(db, username)
-
-
-# ───────────── actualizar ───────────────────────────────────────────────
-@router.patch("/{item_id}", response_model=schemas.ItemOut)
-def patch_item(
-    item_id: int,
-    item_in: schemas.ItemUpdate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    return crud.update_item(db, db_item, item_in)
-
-
-@router.put("/{item_id}", response_model=schemas.ItemOut)
-def put_item(
-    item_id: int,
-    item_in: schemas.ItemCreate,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    return crud.update_item(db, db_item, schemas.ItemUpdate(**item_in.model_dump()))
-
-# ───────────── obtener 1 ítem ────────────────────────────────────────────
-@router.get("/{item_id}", response_model=schemas.ItemOut)
-def get_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Devuelve un único ítem por *ID*.
-
-    404 si no existe.
-    """
-    db_item = crud.get_item(db, item_id)
-    if not db_item:
-        raise HTTPException(404, "Item no encontrado")
-    return db_item
-
-
-
-# ───────────── eliminar ────────────────────────────────────────────────
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-    username: str = Depends(get_current_username),
-):
-    db_item = crud.get_item(db, item_id)
-    if not db_item or db_item.owner_username != username:
-        raise HTTPException(404, "Item no encontrado")
-    crud.delete_item(db, db_item)
-
---- catalog/app/api/categories.py ---
-from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
-from app import crud, schemas
-from app.deps import get_db, get_current_username
-
-router = APIRouter()
-
-
-@router.get("/", response_model=List[schemas.CategoryOut])
-def list_categories(db: Session = Depends(get_db)):
-    return crud.get_categories(db)
-
-
-@router.post(
-    "/", response_model=schemas.CategoryOut, status_code=status.HTTP_201_CREATED
-)
-def create_category(
-    cat_in: schemas.CategoryCreate,
-    db: Session = Depends(get_db),
-    _user=Depends(get_current_username),        # solo autenticados
-):
-    return crud.create_category(db, cat_in)
-
-
-@router.get("/{cat_id}", response_model=schemas.CategoryOut)
-def get_category(cat_id: int, db: Session = Depends(get_db)):
-    cat = crud.get_category(db, cat_id)
-    if not cat:
-        raise HTTPException(404, "Categoría no encontrada")
-    return cat
-
---- catalog/app/api/__init__.py ---
-
-
---- catalog/app/api/upload.py ---
-# services/catalog/app/api/upload.py
-"""
-Endpoint para subir imágenes desde el catálogo.
-También devuelve la **ruta relativa** /uploads/…  para evitar problemas de host.
-"""
-from __future__ import annotations
-
-import os
-import shutil
-import uuid
-from pathlib import Path
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Request,
-    UploadFile,
-    status,
-)
-
-from app.deps import get_current_username
-
-UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-router = APIRouter()
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def upload_image(
-    file: UploadFile,
-    request: Request,
-    _user=Depends(get_current_username),
-):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Solo imágenes")
-
-    ext = Path(file.filename).suffix
-    name = f"{uuid.uuid4()}{ext}"
-    path = UPLOAD_DIR / name
-
-    with path.open("wb") as buf:
-        shutil.copyfileobj(file.file, buf)
-
-    # ← ruta relativa
-    return {"url": f"/uploads/{name}"}
+      <p className="text-gray-500">
+        Debes iniciar sesión para ver tus alquileres.
+      </p>
+    );
+
+  if (loading) return <p className="text-gray-500">Cargando…</p>;
+
+  if (!rentals.length)
+    return <p className="text-gray-500">No tienes alquileres activos.</p>;
+
+  return (
+    <div className="space-y-2">
+      {rentals.map(r => {
+        const [txt, cls] = statusLabel(r.status);
+        return (
+          <div
+            key={r.id}
+            className="flex items-center justify-between rounded-md bg-white p-3 shadow"
+          >
+            <span className="font-medium">{r.item.name}</span>
+            <span className={cls}>{txt}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+--- frontend/src/features/rentals/createRental.ts ---
+// src/features/rentals/createRental.ts
+import { api } from "../../api";
+
+/** Crea un alquiler y devuelve su objeto completo (`RentalOut`). */
+export async function createRental(item_id: number,
+                                   start_at: string,
+                                   end_at: string) {
+  const { data } = await api.post("/rentals/", { item_id, start_at, end_at });
+  return data;                         // ← incluye `deposit`
+}
+
+
+--- frontend/src/features/rentals/useRentals.ts ---
+// src/features/rentals/useRentals.ts
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../api";
+import { Item } from "../items/useItems";
+
+/* ------------------------------------------------------------------ */
+/*                              Types                                 */
+/* ------------------------------------------------------------------ */
+
+export type RentalStatus = "pending" | "confirmed" | "returned";
+
+export type Rental = {
+  id: number;
+  item: Item;
+  start_at: string;
+  end_at: string;
+  deposit: number;
+  status: RentalStatus;       // ← reemplaza a «returned»
+};
+
+/* ------------------------------------------------------------------ */
+/*                               Hook                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Devuelve los alquileres del usuario autenticado.
+ * La petición solo se dispara cuando `token` es truthy.
+ */
+export function useRentals(token: string | null) {
+  const enabled = Boolean(token);
+
+  const { data, isLoading, refetch } = useQuery<Rental[]>({
+    queryKey: ["rentals"],
+    queryFn: () => api.get<Rental[]>("/rentals/me").then(r => r.data),
+    enabled,
+    staleTime: 60_000,
+    retry: false
+  });
+
+  return { data: data ?? [], loading: isLoading, refetch };
+}
+
+
+--- frontend/src/features/rentals/payments/createIntent.ts ---
+// src/features/payments/createIntent.ts
+import { api } from "../../../api";
+
+export async function createIntent(amount: number) {
+  const { data } = await api.post("/payments/create-intent", { amount });
+  return data as { client_secret: string };
+}
+
+
+--- frontend/src/pages/Register.tsx ---
+// src/pages/Register.tsx
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import zxcvbn from "zxcvbn";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import clsx from "clsx";
+import { useEffect, useState } from "react";  // +useState for terms modal
+import { FaEye, FaEyeSlash } from "react-icons/fa";  // +eye
+
+import { register as apiRegister } from "../features/auth/register";
+import { login as apiLogin } from "../features/auth/login";
+import { useAuth } from "../hooks/useAuth";
+
+import Container from "../components/shared/Container";
+import SocialButton from "../components/ui/SocialButton";
+import { FcGoogle } from "react-icons/fc";
+import { FaGithub } from "react-icons/fa";
+
+const schema = z
+  .object({
+    username: z.string().min(3, "Mín. 3 caracteres"),
+    email: z.string().email("Email inválido"),
+    password: z.string().min(8, "Mín. 8 caracteres"),
+    confirm: z.string(),
+    terms: z.literal(true, { errorMap: () => ({ message: "Acepta los términos" }) }),
+  })
+  .refine(data => data.password === data.confirm, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirm"],
+  });
+
+type FormData = z.infer<typeof schema>;
+
+export default function Register() {
+  const navigate = useNavigate();
+  const { login: saveToken } = useAuth();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  const pwd = watch("password", "");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle
+  const [showTermsModal, setShowTermsModal] = useState(false);  // NEW: Terms modal
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      await apiRegister(data.username, data.email, data.password);
+      const token = await apiLogin(data.username, data.password);
+      saveToken(token);
+      toast.success("Cuenta creada, ¡bienvenido!");
+      navigate("/dashboard");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "No se pudo crear la cuenta.");
+    }
+  };
+
+  useEffect(() => {  // Fade-in
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const strength = zxcvbn(pwd);
+  const strengthColors = ['bg-red-500', 'bg-orange-400', 'bg-yellow-400', 'bg-lime-500', 'bg-green-600'];
+
+  return (
+    <Container>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500">  {/* FIXED: +fade-in */}
+          <h1 className="text-center text-3xl font-bold text-gray-900">Crear cuenta</h1>
+
+          <div className="space-y-4">
+            <SocialButton provider="google" icon={FcGoogle} label="Continuar con Google" />
+            <SocialButton provider="github" icon={FaGithub} label="Continuar con GitHub" />
+          </div>
+
+          <div className="relative my-6">
+            <hr className="border-gray-300" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-4 text-sm text-gray-500">o con email</span>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="relative">
+              <label htmlFor="username" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Nombre de usuario</label>
+              <input id="username" {...register("username")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand" placeholder=" " />
+              {errors.username && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.username.message}</p>}  {/* +icon */}
+            </div>
+
+            <div className="relative">
+              <label htmlFor="email" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Email</label>
+              <input id="email" type="email" {...register("email")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand" placeholder=" " />
+              {errors.email && <p className="mt-1 text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.email.message}</p>}
+            </div>
+
+            <div className="relative">
+              <label htmlFor="password" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+              <input id="password" type={showPwd ? "text" : "password"} {...register("password")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+              <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand">
+                {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {/* Strength meter with tips */}
+            {pwd && (
+              <div className="space-y-1">
+                <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
+                  <div style={{ width: `${(strength.score + 1) * 20}%` }} className={clsx("h-full transition-all", strengthColors[strength.score])} />
+                </div>
+                <p className="text-xs text-gray-500">{strength.feedback.suggestions.join(' ')}</p>  {/* +tips from zxcvbn */}
+              </div>
+            )}
+            {errors.password && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.password.message}</p>}
+
+            <div className="relative">
+              <label htmlFor="confirm" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Repite contraseña</label>
+              <input id="confirm" type={showPwd ? "text" : "password"} {...register("confirm")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+            </div>
+            {errors.confirm && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.confirm.message}</p>}
+
+            <label className="flex flex-wrap items-center gap-2 text-sm text-gray-600">  {/* FIXED: +flex-wrap items-center, gap-2 para better spacing */}
+              <input type="checkbox" {...register("terms")} className="rounded border-gray-300 text-brand focus:ring-brand" />
+              Acepto los <button type="button" onClick={() => setShowTermsModal(true)} className="text-brand hover:underline">Términos y Política de privacidad</button>
+            </label>
+            {errors.terms && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.terms.message}</p>}
+
+            <button className="btn w-full rounded-lg py-3 text-base font-semibold" disabled={isSubmitting}>  {/* +styles */}
+              {isSubmitting ? "Creando…" : "Crear cuenta"}
+            </button>
+          </form>
+
+          {/* Terms Modal (simple dialog) */}
+          {showTermsModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="max-w-md rounded-lg bg-white p-6 shadow-xl">
+                <h3 className="text-lg font-semibold">Términos y Privacidad</h3>
+                <p className="mt-2 text-sm text-gray-600">Aquí irían los términos reales. Para demo, cierra.</p>
+                <button onClick={() => setShowTermsModal(false)} className="mt-4 btn w-full">Cerrar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </Container>
+  );
+}
+
+--- frontend/src/pages/Login.tsx ---
+// src/pages/Login.tsx
+import { FormEvent, useState, useEffect } from "react";  // +useEffect para anim
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { login as apiLogin } from "../features/auth/login";
+import { FcGoogle } from "react-icons/fc";
+import { FaGithub, FaEye, FaEyeSlash } from "react-icons/fa";  // +eye icons
+import SocialButton from "../components/ui/SocialButton";
+import Container from "../components/shared/Container";
+import toast from "react-hot-toast";
+import clsx from "clsx";
+
+export default function Login() {
+  const [user, setUser] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle visibility
+  const [error, setError] = useState<string | null>(null);
+  const [animateError, setAnimateError] = useState(false);  // NEW: Shake anim
+
+  const { login: saveToken } = useAuth();
+  const nav = useNavigate();
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const token = await apiLogin(user.trim(), pwd);
+      saveToken(token);
+      nav("/dashboard");
+      toast.success("¡Bienvenido de nuevo!");
+      setError(null);
+    } catch {
+      toast.error("Usuario o contraseña incorrectos");
+      setError("Credenciales inválidas");
+      setAnimateError(true);
+      setTimeout(() => setAnimateError(false), 300);  // Reset anim
+    }
+  }
+
+  useEffect(() => {  // Fade-in anim on mount
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <Container>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">  {/* +bg for pro look */}
+        <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500">  {/* FIXED: +fade-in */}
+          <h1 className="text-center text-3xl font-bold text-gray-900">Iniciar sesión</h1>  {/* +text-3xl */}
+
+          {/* ---------- Login social ---------- */}
+          <div className="space-y-4">
+            <SocialButton provider="google" icon={FcGoogle} label="Continuar con Google" />  {/* Updated label */}
+            <SocialButton provider="github" icon={FaGithub} label="Continuar con GitHub" />
+          </div>
+
+          <div className="relative my-6">
+            <hr className="border-gray-300" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 bg-white px-4 text-sm text-gray-500">o con email</span>  {/* +text-sm */}
+          </div>
+
+          {/* ---------- Formulario ---------- */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="relative">
+              <label htmlFor="user" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Usuario</label>  {/* Floating label */}
+              <input
+                id="user"
+                className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand"
+                placeholder=" "
+                value={user}
+                onChange={e => setUser(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="relative">
+              <label htmlFor="pwd" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+              <input
+                id="pwd"
+                type={showPwd ? "text" : "password"}
+                className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10"  
+                placeholder=" "
+                value={pwd}
+                onChange={e => setPwd(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand"
+              >
+                {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            {error && (
+              <p className={clsx("text-center text-sm text-red-600 error-shake", animateError && "animate-shake")}>{error}</p> 
+            )}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm">  {/* FIXED: flex-col en mobile, gap-2 para spacing */}
+              <label className="flex items-center gap-2">
+                <input type="checkbox" className="rounded border-gray-300 text-brand focus:ring-brand" />
+                Recordarme
+              </label>
+              <Link to="/forgot-password" className="text-brand hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+
+            <button className="btn w-full rounded-lg py-3 text-base font-semibold">  {/* +py-3, text-base */}
+              Entrar
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-gray-500">
+            ¿No tienes cuenta? <Link to="/register" className="text-brand font-medium hover:underline">Regístrate</Link>
+          </p>
+        </div>
+      </main>
+    </Container>
+  );
+}
+
+--- frontend/src/pages/Dashboard.tsx ---
+import Container from '../components/shared/Container';
+import ItemList from '../features/items/ItemList';
+import RentalList from '../features/rentals/RentalList';
+import Section from '../components/shared/Section';
+
+export default function Dashboard() {
+  return (
+    <Container>
+      <Section title="Mis alquileres">
+        <RentalList />
+      </Section>
+
+      <Section title="Catálogo público">
+        <ItemList />
+      </Section>
+    </Container>
+  );
+}
+
+
+--- frontend/src/pages/Home.tsx ---
+/* src/pages/Home.tsx */
+import { Link } from 'react-router-dom';
+import {
+  ArrowRightIcon,
+  PlusIcon,
+  CloudArrowUpIcon,
+  CalendarDaysIcon,
+  BanknotesIcon,
+  ShieldCheckIcon,  // NEW: Para benefits
+  UsersIcon,        // NEW
+  GlobeAltIcon,     // NEW
+} from '@heroicons/react/24/solid';
+import { useEffect, useRef, useState } from 'react';  // NEW: Para animaciones
+import clsx from 'clsx';
+
+import Container from '../components/shared/Container';
+import Section from '../components/shared/Section';
+
+import Stats from '../components/Home/Stats';
+import LogoCloud from '../components/Home/LogoCloud';
+import Testimonials from '../components/Home/Testimonials';
+import FAQ from '../components/Home/FAQ';
+
+// NEW: Sección Benefits
+const Benefits = () => {
+  const BENEFITS = [
+    { icon: ShieldCheckIcon, title: 'Seguro y confiable', desc: 'Pagos protegidos con Stripe y verificación de usuarios.' },
+    { icon: UsersIcon, title: 'Comunidad local', desc: 'Conecta con vecinos y reduce huella ecológica.' },
+    { icon: GlobeAltIcon, title: 'Fácil de usar', desc: 'Publica en minutos, reserva al instante.' },
+  ];
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+    Array.from(el.querySelectorAll('.fade-in')).forEach(child => io.observe(child));
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Section title="Beneficios">
+      <Container>
+        <div ref={ref} className="grid gap-8 md:grid-cols-3">
+          {BENEFITS.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="fade-in text-center space-y-2 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-gray-800 dark:shadow-gray-700">  {/* 🆕 Dark variants */}
+              <Icon className="mx-auto h-12 w-12 text-brand" />
+              <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
+              <p className="text-gray-600 dark:text-gray-300">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </Container>
+    </Section>
+  );
+};
+
+const STEPS = [  // Updated: Cards con shadows
+  {
+    title: 'Publica',
+    desc: 'Sube tu producto, ponle precio y límites de uso.',
+    icon: CloudArrowUpIcon,
+  },
+  {
+    title: 'Reserva',
+    desc: 'Los usuarios pagan la fianza y reservan al instante.',
+    icon: CalendarDaysIcon,
+  },
+  {
+    title: 'Gana',
+    desc: 'Entregas el ítem, recibes el pago y valoraciones ⭐',
+    icon: BanknotesIcon,
+  },
+];
+
+export default function Home() {
+  const stepsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {  // Animación para steps
+    const el = stepsRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          Array.from(e.target.children).forEach((child, i) => {
+            child.classList.add('visible');
+            (child as HTMLElement).style.transitionDelay = `${i * 0.2}s`;
+          });
+        }
+      });
+    }, { threshold: 0.2 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <>
+      {/* ---------- HERO (mejorado: gradient + overlay image, dark mode, más contraste) ---------- */}
+      <section 
+        className="relative isolate overflow-hidden py-32 text-white dark:text-gray-100"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), transparent), url("https://source.unsplash.com/random/1920x1080/?tools,renting,community&w=1920") no-repeat center/cover',  // 🆕 Optimizado con ?w=1920
+        }}
+      >
+        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl animate-pulse dark:bg-gray-800/10" />  {/* 🆕 Dark variant */}
+
+        <Container>
+          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center fade-in visible">  {/* +fade-in */}
+            <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight md:text-6xl">  {/* +md:text-6xl */}
+              Dónde tus cosas <br className="hidden sm:inline" />
+              <span className="text-white/80 dark:text-gray-300/80">cambian de mano</span>
+            </h1>
+
+            <p className="max-w-xl text-lg/relaxed text-white/90 dark:text-gray-300">
+              Alquila herramientas, gadgets o equipamiento deportivo y monetiza lo
+              que ya tienes. ¡Conecta con tu barrio y ahorra al planeta!
+            </p>
+
+            <div className="flex flex-wrap justify-center gap-4">
+              <Link to="/dashboard" className="btn inline-flex gap-2">
+                Explorar catálogo <ArrowRightIcon className="h-5 w-5" />
+              </Link>
+              <Link to="/dashboard#add" className="btn--ghost inline-flex gap-2">
+                <PlusIcon className="h-5 w-5" />
+                Publicar mi primer ítem
+              </Link>
+            </div>
+          </div>
+        </Container>
+
+        {/* wave separator (más suave, dark mode) */}
+        <svg
+          aria-hidden
+          viewBox="0 0 1440 120"
+          className="block w-full text-brand dark:text-gray-800"  // 🆕 Dark variant
+          preserveAspectRatio="none"
+        >
+          <path
+            d="M0,96L48,106.7C96,117,192,139,288,128C384,117,480,75,576,58.7C672,43,768,53,864,74.7C960,96,1056,128,1152,138.7C1248,149,1344,139,1392,133.3L1440,128L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"
+            className="fill-white dark:fill-gray-900"  // 🆕 Dark fill
+          />
+        </svg>
+      </section>
+
+      {/* ---------- STATS (ya animado, con dark mode) ---------- */}
+      <Stats />
+
+      {/* ---------- LOGO CLOUD (con hover, dark mode) ---------- */}
+      <LogoCloud />
+
+      {/* ---------- BENEFITS (nueva sección) ---------- */}
+      <Benefits />
+
+      {/* ---------- CÓMO FUNCIONA (cards con animaciones secuenciales, alterna bg) ---------- */}
+      <Section title="¿Cómo funciona?" className="bg-gray-100 dark:bg-gray-800">  {/* 🆕 Alterna bg para contraste */}
+        <Container>
+          <div ref={stepsRef} className="grid gap-12 md:grid-cols-3">
+            {STEPS.map(({ title, desc, icon: Icon }) => (
+              <div key={title} className="fade-in text-center space-y-4 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-gray-700 dark:shadow-gray-800">  {/* 🆕 Dark */}
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 dark:bg-brand/20">
+                  <Icon className="h-6 w-6 text-brand" />
+                </div>
+                <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
+                <p className="text-gray-600 dark:text-gray-300">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </Container>
+      </Section>
+
+      {/* ---------- TESTIMONIALS (mejorado: grid responsivo, alterna bg) ---------- */}
+      <Testimonials className="bg-white dark:bg-gray-900" />  {/* 🆕 Dark */}
+
+      {/* ---------- FAQ (con iconos y transiciones, alterna bg con radial-gradient en CTA) ---------- */}
+      <FAQ className="bg-gray-100 dark:bg-gray-800" />  {/* 🆕 Alterna bg (gray-100 para menos claror) */}
+
+      {/* ---------- CTA FINAL (con animación, radial-gradient sutil) ---------- */}
+      <section className="bg-brand py-16 text-center text-white fade-in relative" style={{ backgroundImage: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent)' }}>  {/* 🆕 Radial-gradient más visible (0.15) para profundidad */}
+        <Container>
+          <h2 className="mb-6 text-3xl font-bold">
+            ¿Listo para estrenar ingresos extra?
+          </h2>
+          <Link to="/register" className="btn inline-flex gap-2">
+            Crear cuenta gratis <ArrowRightIcon className="h-5 w-5" />
+          </Link>
+        </Container>
+      </section>
+    </>
+  );
+}
+
+--- frontend/src/pages/ForgotPassword.tsx ---
+import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+
+import Container from "../components/shared/Container";
+import { forgot } from "../features/auth/forgot";
+
+export default function ForgotPassword() {
+  const [user, setUser] = useState("");
+  const [loading, setLoading] = useState(false);
+  const nav = useNavigate();
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const token = await forgot(user.trim());
+      toast.success("Token generado: revisa tu correo (demo: consola)");
+      console.info("🔑 reset_token =", token);   // ← visible en consola dev
+      nav(`/reset-password?token=${token}`);
+    } catch (err: any) {
+      setLoading(false);
+      const msg =
+        err?.response?.status === 404
+          ? "Usuario no encontrado"
+          : err?.response?.data?.detail ?? "Error inesperado";
+      toast.error(msg);
+    }
+  }
+
+  return (
+    <Container>
+      <main className="flex min-h-[70vh] items-center justify-center">
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-md space-y-6 rounded-xl bg-white p-8 shadow-card"
+        >
+          <h1 className="text-center text-2xl font-bold">
+            Restablecer contraseña
+          </h1>
+
+          <input
+            value={user}
+            onChange={e => setUser(e.target.value)}
+            placeholder="Nombre de usuario"
+            className="form-input w-full"
+            required
+          />
+
+          <button className="btn w-full" disabled={loading}>
+            {loading ? "Enviando…" : "Generar enlace"}
+          </button>
+        </form>
+      </main>
+    </Container>
+  );
+}
+
+
+--- frontend/src/pages/ResetPassword.tsx ---
+// src/pages/ResetPassword.tsx
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import toast from "react-hot-toast";
+import { useEffect, useState } from "react";  // +useState for toggle
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+
+import Container from "../components/shared/Container";
+import { reset } from "../features/auth/reset";
+import clsx from "clsx";
+import zxcvbn from "zxcvbn";  // +strength
+
+const schema = z
+  .object({
+    password: z.string().min(8, "Mínimo 8 caracteres"),
+    confirm: z.string()
+  })
+  .refine(d => d.password === d.confirm, {
+    message: "No coincide",
+    path: ["confirm"]
+  });
+
+type Form = z.infer<typeof schema>;
+
+export default function ResetPassword() {
+  const [params] = useSearchParams();
+  const tokenQP = params.get("token") ?? "";
+  const nav = useNavigate();
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting }
+  } = useForm<Form>({
+    resolver: zodResolver(schema)
+  });
+
+  const pwd = watch("password", "");
+  const [showPwd, setShowPwd] = useState(false);  // NEW: Toggle
+
+  const onSubmit = async (data: Form) => {
+    try {
+      await reset(tokenQP, data.password);
+      toast.success("Contraseña actualizada");
+      nav("/login");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Token inválido o expirado.");
+    }
+  };
+
+  useEffect(() => {  // Fade-in
+    const timer = setTimeout(() => document.querySelector('.form-container')?.classList.add('visible'), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const strength = zxcvbn(pwd);
+  const strengthColors = ['bg-red-500', 'bg-orange-400', 'bg-yellow-400', 'bg-lime-500', 'bg-green-600'];
+
+  return (
+    <Container>
+      <main className="flex min-h-screen items-center justify-center bg-gray-50">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-2xl fade-in form-container transition-opacity duration-500"  // FIXED: +fade-in
+        >
+          <h1 className="text-center text-3xl font-bold text-gray-900">Nueva contraseña</h1>
+
+          <div className="relative">
+            <label htmlFor="password" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Contraseña</label>
+            <input id="password" type={showPwd ? "text" : "password"} {...register("password")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+            <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand">
+              {showPwd ? <FaEyeSlash className="h-5 w-5" /> : <FaEye className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {pwd && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
+                <div style={{ width: `${(strength.score + 1) * 20}%` }} className={clsx("h-full transition-all", strengthColors[strength.score])} />
+              </div>
+              <p className="text-xs text-gray-500">{strength.feedback.suggestions.join(' ')}</p>
+            </div>
+          )}
+          {errors.password && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.password.message}</p>}
+
+          <div className="relative">
+            <label htmlFor="confirm" className="absolute -top-2 left-3 bg-white px-1 text-xs text-gray-600">Repite contraseña</label>
+            <input id="confirm" type={showPwd ? "text" : "password"} {...register("confirm")} className="form-input w-full rounded-lg border-gray-300 focus:border-brand focus:ring-brand pr-10" placeholder=" " />
+          </div>
+          {errors.confirm && <p className="text-xs text-red-600 flex items-center gap-1"><span>⚠️</span>{errors.confirm.message}</p>}
+
+          <button className="btn w-full rounded-lg py-3 text-base font-semibold" disabled={isSubmitting}>
+            {isSubmitting ? "Guardando…" : "Cambiar contraseña"}
+          </button>
+
+          <p className="text-center text-sm text-gray-500">
+            ¿Recordaste tu clave? <Link to="/login" className="text-brand font-medium hover:underline">Iniciar sesión</Link>
+          </p>
+        </form>
+      </main>
+    </Container>
+  );
+}
+
+--- frontend/src/components/ui/PaymentModal.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/ui/PaymentModal.tsx                                        */
+/* -------------------------------------------------------------------------- */
+import { Fragment, useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  Elements,
+  PaymentElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
+
+/* ⚠️  usa tu clave pública de Stripe (env var VITE_STRIPE_PK) */
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
+
+type Props = {
+  open: boolean;
+  clientSecret: string;
+  onClose: () => void;
+  onSuccess: () => void;
+};
+
+export default function PaymentModal(props: Props) {
+  const { open, clientSecret, onClose, onSuccess } = props;
+
+  if (!clientSecret) return null;
+
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="relative z-[60]">
+        {/* ---- backdrop ---- */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+        </Transition.Child>
+
+        {/* ---- panel ---- */}
+        <div className="fixed inset-0 grid place-items-center p-4">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="scale-95 opacity-0"
+            enterTo="scale-100 opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="scale-100 opacity-100"
+            leaveTo="scale-95 opacity-0"
+          >
+            <Dialog.Panel className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
+              <header className="flex items-center justify-between border-b px-5 py-4">
+                <Dialog.Title className="text-base font-semibold">
+                  Pago de fianza
+                </Dialog.Title>
+                <button
+                  onClick={onClose}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </header>
+
+              <Elements
+                stripe={stripePromise}
+                options={{ clientSecret, appearance: { theme: "stripe" } }}
+              >
+                <CheckoutForm onCancel={onClose} onSuccess={onSuccess} />
+              </Elements>
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+/* ------------------------ formulario interno ----------------------------- */
+function CheckoutForm({
+  onCancel,
+  onSuccess,
+}: {
+  onCancel: () => void;
+  onSuccess: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const qc = useQueryClient();  // ← invalidate cache
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+
+    setProcessing(false);
+
+    if (error) {
+      toast.error(error.message ?? "No se pudo procesar el pago.");
+    } else {
+      /* 🔄 refrescar lista de alquileres */
+      qc.invalidateQueries({ queryKey: ["rentals"] });
+      onSuccess(); // ← callback del padre
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 p-6">
+      {/* Tarjeta / Wallets / iDEAL, etc. */}
+      <PaymentElement />
+
+      <div className="flex items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn-secondary px-4 py-2 text-sm"
+        >
+          Cancelar
+        </button>
+
+        <button
+          disabled={!stripe || !elements || processing}
+          className="btn px-6 py-2 text-sm"
+        >
+          {processing ? (
+            <>
+              <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
+              Procesando…
+            </>
+          ) : (
+            "Pagar y confirmar"
+          )}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+
+--- frontend/src/components/ui/SkeletonCard.tsx ---
+export default function SkeletonCard() {
+  return (
+    <article
+      className="
+        flex flex-col overflow-hidden rounded-lg bg-white shadow-card
+        animate-pulse
+      "
+    >
+      {/* zona de imagen (mantiene proporción 4:3) */}
+      <div className="aspect-[4/3] w-full bg-gray-200" />
+
+      {/* zona de texto */}
+      <div className="space-y-2 p-4">
+        <div className="h-4 w-2/3 rounded bg-gray-200" />
+        <div className="h-4 w-1/3 rounded bg-gray-200" />
+      </div>
+    </article>
+  );
+}
+
+
+--- frontend/src/components/ui/LazyImage.tsx ---
+import { useState } from 'react';
+
+type Props = {
+  src: string;
+  alt: string;
+  className?: string;
+  /** ancho estimado para el atributo `sizes` (ej. "100vw", "50vw") */
+  sizes?: string;
+};
+
+export default function LazyImage({
+  src,
+  alt,
+  className = '',
+  sizes = '100vw'
+}: Props) {
+  const [loaded, setLoaded] = useState(false);
+
+  /* genera srcset (320-640-960 px) */
+  const srcset = [320, 640, 960]
+    .map(w => `${src.replace(/(\?.*)?$/, '')}?w=${w} ${w}w`)
+    .join(', ');
+
+  return (
+    <img
+      src={src}
+      srcSet={srcset}
+      sizes={sizes}
+      loading="lazy"
+      decoding="async"                    /* 🆕 */
+      onLoad={() => setLoaded(true)}
+      className={`${className} transition-opacity duration-500 ${
+        loaded ? 'opacity-100' : 'opacity-0'
+      }`}
+      alt={alt}
+    />
+  );
+}
+
+
+--- frontend/src/components/ui/ItemCard.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/ui/ItemCard.tsx                                            */
+/* -------------------------------------------------------------------------- */
+import { useState } from "react";
+import { HeartIcon, EyeIcon } from "@heroicons/react/24/solid";
+import clsx from "clsx";
+
+import { Item } from "../../features/items/useItems";
+import { resolveImage } from "../../utils";
+import LazyImage from "./LazyImage";
+import ProductDetailModal from "../../features/items/item-detail/ProductDetailModal";
+
+export default function ItemCard({ item }: { item: Item }) {
+  const [open, setOpen] = useState(false);
+
+  /* -------- portada (1ª del array o la legacy) -------- */
+  const cover = item.image_urls?.[0] ?? item.image_url;
+
+  const imgSrc = resolveImage(
+    cover,
+    `https://source.unsplash.com/640x480/?${encodeURIComponent(item.name)}`
+  );
+
+  return (
+    <>
+      <article
+        onClick={() => setOpen(true)}
+        className="flex cursor-pointer flex-col overflow-hidden rounded-lg bg-surface shadow-card transition-transform duration-200 hover:-translate-y-1 hover:shadow-cardHover"
+      >
+        {/* ---------- Foto ---------- */}
+        <div className="relative">
+          <LazyImage
+            src={imgSrc}
+            alt={item.name}
+            className="aspect-[4/3] w-full object-contain p-2"
+          />
+
+          {!item.available && (
+            <span className="absolute left-0 top-0 rounded-br-md bg-red-600/90 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
+              Alquilado
+            </span>
+          )}
+
+          {/* acciones rápidas */}
+          <div className="absolute inset-0 flex items-start justify-end gap-2 p-2 opacity-0 transition-opacity hover:opacity-100">
+            <IconBtn title="Vista rápida">
+              <EyeIcon className="h-5 w-5" />
+            </IconBtn>
+            <IconBtn title="Favorito">
+              <HeartIcon className="h-5 w-5" />
+            </IconBtn>
+          </div>
+        </div>
+
+        {/* ---------- Info ---------- */}
+        <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
+          <h3 className="line-clamp-1 text-lg font-semibold">{item.name}</h3>
+
+          {item.description && (
+            <p className="line-clamp-2 text-sm text-gray-600">
+              {item.description}
+            </p>
+          )}
+
+          <div className="mt-auto flex items-center justify-between">
+            <p className="text-base font-bold text-brand">
+              {item.price_per_h.toFixed(2)} €/h
+            </p>
+            <span
+              className={clsx(
+                "badge",
+                item.available ? "badge--ok" : "badge--danger"
+              )}
+            >
+              {item.available ? "Disponible" : "Alquilado"}
+            </span>
+          </div>
+        </div>
+      </article>
+
+      {/* ---------- Modal de detalle ---------- */}
+      {/*  ⬇️  Enviamos el ID correcto                                  */}
+      <ProductDetailModal
+        open={open}
+        onClose={() => setOpen(false)}
+        itemId={item.id}
+      />
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Helpers                                    */
+/* -------------------------------------------------------------------------- */
+function IconBtn({
+  children,
+  title
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={e => e.stopPropagation()}
+      className="rounded-full bg-white/90 p-1 text-gray-600 shadow transition-colors hover:bg-white"
+    >
+      {children}
+    </button>
+  );
+}
+
+
+--- frontend/src/components/ui/SearchBar.tsx ---
+import { useForm } from 'react-hook-form';
+
+type Props = { onSubmit: (q: URLSearchParams) => void };
+
+export default function SearchBar({ onSubmit }: Props) {
+  const { register, handleSubmit, reset } = useForm<{
+    q: string;
+    min: number | undefined;
+    max: number | undefined;
+  }>({ defaultValues: { q: '', min: undefined, max: undefined } });
+
+  return (
+    <form
+      onSubmit={handleSubmit(values => {
+        const params = new URLSearchParams();
+        if (values.q) params.set('name', values.q);
+        if (values.min) params.set('min_price', values.min.toString());
+        if (values.max) params.set('max_price', values.max.toString());
+        onSubmit(params);
+      })}
+      className="flex flex-wrap items-end gap-3"
+    >
+      <input
+        {...register('q')}
+        placeholder="Buscar producto…"
+        className="form-input w-52"
+      />
+      <input
+        {...register('min', { valueAsNumber: true })}
+        type="number"
+        step="0.1"
+        min={0}
+        placeholder="€ mínimo"
+        className="form-input w-32"
+      />
+      <input
+        {...register('max', { valueAsNumber: true })}
+        type="number"
+        step="0.1"
+        min={0}
+        placeholder="€ máximo"
+        className="form-input w-32"
+      />
+      <button className="btn">Filtrar</button>
+      <button
+        type="button"
+        onClick={() => {
+          reset();
+          onSubmit(new URLSearchParams());
+        }}
+        className="btn--ghost"
+      >
+        Limpiar
+      </button>
+    </form>
+  );
+}
+
+
+--- frontend/src/components/ui/SocialButton.tsx ---
+// src/components/ui/SocialButton.tsx
+import { IconType } from 'react-icons';
+import clsx from 'clsx';
+
+type Props = {
+  icon: IconType;
+  label: string;
+  provider: 'google' | 'github';
+};
+
+export default function SocialButton({ icon: Icon, label, provider }: Props) {
+  return (
+    <a
+      href={`/api/oauth/${provider}`}           /* El backend redirige al proveedor */
+      className={clsx(
+        'btn flex w-full items-center justify-center gap-2',
+        provider === 'google' && 'bg-white text-gray-700 shadow border hover:bg-gray-50',
+        provider === 'github' && 'bg-gray-900 text-white hover:bg-gray-800'
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </a>
+  );
+}
+
+
+--- frontend/src/components/ui/QuickViewModal.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/ui/QuickViewModal.tsx                                      */
+/*  – ahora permite reservar el ítem vía micro-servicio **rentals**           */
+/* -------------------------------------------------------------------------- */
+import { Fragment } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import {
+  XMarkIcon,
+  StarIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
+import { useMutation } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import clsx from "clsx";
+
+import { Item } from "../../features/items/useItems";
+import { createRental } from "../../features/rentals/createRental";
+import { useAuth } from "../../hooks/useAuth";
+import LazyImage from "./LazyImage";
+import { resolveImage } from "../../utils";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  item: Item | null;
+};
+
+export default function QuickViewModal({ open, onClose, item }: Props) {
+  /* ─────────── guard clause ─────────── */
+  if (!item) return null;
+
+  /* portada (1ª imagen o fallback) */
+  const cover = item.image_urls?.[0] ?? item.image_url;
+  const imgSrc = resolveImage(
+    cover,
+    `https://source.unsplash.com/800x600/?${encodeURIComponent(item.name)}`
+  );
+
+  /* ─────────── auth + reserva ─────────── */
+  const { token } = useAuth();
+
+  /* reserva de **1 h** a partir de “ya” (demo) */
+  const reserve = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
+      return createRental(item.id, now.toISOString(), plus1h.toISOString());
+    },
+    onSuccess: data => {
+      toast.success(
+        `Reserva confirmada ✔️  •  Fianza: ${data.deposit.toFixed(2)} €`
+      );
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.detail ??
+        "No se pudo crear la reserva. Inténtalo más tarde.";
+      toast.error(msg);
+    },
+  });
+
+  const handleReserve = () => {
+    if (!token) return toast.error("Debes iniciar sesión");
+    if (!item.available)
+      return toast.error("Este ítem no está disponible ahora mismo");
+    reserve.mutate();
+  };
+
+  /* ────────────────── UI ────────────────── */
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="relative z-50">
+        {/* ---------- Backdrop ---------- */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+        </Transition.Child>
+
+        {/* ---------- Panel ---------- */}
+        <div className="fixed inset-0 grid place-items-center p-4">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="scale-95 opacity-0"
+            enterTo="scale-100 opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="scale-100 opacity-100"
+            leaveTo="scale-95 opacity-0"
+          >
+            <Dialog.Panel className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+              {/* ───────── header ───────── */}
+              <header className="flex items-center justify-between border-b p-4">
+                <Dialog.Title className="text-lg font-semibold">
+                  {item.name}
+                </Dialog.Title>
+                <button
+                  onClick={onClose}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </header>
+
+              {/* ───────── body ───────── */}
+              <section className="grid gap-6 overflow-y-auto p-6 md:grid-cols-2">
+                {/* imagen */}
+                <div className="flex items-center justify-center">
+                  <LazyImage
+                    src={imgSrc}
+                    alt={item.name}
+                    className="w-full max-h-[60vh] rounded-lg object-contain"
+                  />
+                </div>
+
+                {/* info */}
+                <div className="flex flex-col gap-4">
+                  <p className="text-2xl font-bold text-brand">
+                    {item.price_per_h.toFixed(2)} €/h
+                  </p>
+
+                  {/* rating provisional */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <StarIcon
+                        key={i}
+                        className={clsx(
+                          "h-5 w-5",
+                          i < 4
+                            ? "fill-amber-400 stroke-amber-400"
+                            : "stroke-gray-300"
+                        )}
+                      />
+                    ))}
+                    <span className="ml-1 text-sm text-gray-500">(4,0)</span>
+                  </div>
+
+                  {item.description ? (
+                    <p className="prose max-w-none text-sm leading-relaxed">
+                      {item.description}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Sin descripción.</p>
+                  )}
+
+                  {!!item.categories?.length && (
+                    <div className="flex flex-wrap gap-2">
+                      {item.categories.map(c => (
+                        <span
+                          key={c.id}
+                          className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
+                        >
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ───────── CTA ───────── */}
+                  <button
+                    onClick={handleReserve}
+                    disabled={reserve.isLoading}
+                    className="btn mt-auto w-full"
+                  >
+                    {reserve.isLoading ? (
+                      <>
+                        <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
+                        Reservando…
+                      </>
+                    ) : (
+                      "Reservar ahora"
+                    )}
+                  </button>
+                </div>
+              </section>
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+
+--- frontend/src/components/shared/Section.tsx ---
+type Props = {
+  title?: string;
+  children: React.ReactNode;
+  id?: string;
+};
+
+export default function Section({ title, children, id }: Props) {
+  return (
+    <section id={id} className="space-y-6 py-16">
+      {title && (
+        <h2 className="text-center text-3xl font-bold tracking-tight">{title}</h2>
+      )}
+      {children}
+    </section>
+  );
+}
+
+
+--- frontend/src/components/shared/Container.tsx ---
+export default function Container({ children }: { children: React.ReactNode }) {
+  return <div className="container">{children}</div>;
+}
+
+
+--- frontend/src/components/layout/Footer.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/layout/Footer.tsx                                          */
+/* -------------------------------------------------------------------------- */
+import {
+  FaGithub,
+  FaLinkedin,
+  FaTwitter,
+  FaInstagram,
+} from 'react-icons/fa6';
+import { Link } from 'react-router-dom';
+import logo from '../../assets/logo.png';
+
+const year = new Date().getFullYear();
+
+export default function Footer() {
+  return (
+    <footer className="bg-gray-900 text-gray-300">
+      {/* ----------------------------- ZONA SUPERIOR ----------------------------- */}
+      <div className="container mx-auto grid gap-12 px-6 py-16 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Marca + descripción */}
+        <div className="space-y-4 lg:col-span-2">
+          <Link to="/" className="flex items-center gap-2">
+            <img
+              src={logo}
+              alt="Logo Rental‑MVP"
+              className="h-10 w-auto"
+              decoding="async"
+            />
+            <span className="sr-only">Rental‑MVP</span>
+          </Link>
+          <p className="max-w-sm text-sm leading-relaxed text-gray-400">
+            Plataforma de alquiler P2P para herramientas, gadgets y mucho
+            más. Monetiza lo que tienes y ayuda al planeta reduciendo el
+            consumo masivo.
+          </p>
+        </div>
+
+        {/* Navegación */}
+        <FooterCol title="Producto">
+          <FooterLink to="/">Explorar</FooterLink>
+          <FooterLink to="/dashboard#add">
+            Publicar ítem
+          </FooterLink>
+          <FooterLink to="/pricing">Precios</FooterLink>
+          <FooterLink to="/docs">Documentación API</FooterLink>
+        </FooterCol>
+
+        <FooterCol title="Empresa">
+          <FooterLink to="/about">Sobre nosotros</FooterLink>
+          <FooterLink to="/blog">Blog</FooterLink>
+          <FooterLink to="/careers">Empleo</FooterLink>
+          <FooterLink to="/contact">Contacto</FooterLink>
+        </FooterCol>
+
+        <FooterCol title="Legal">
+          <FooterLink to="/legal/terms">Términos</FooterLink>
+          <FooterLink to="/legal/privacy">Privacidad</FooterLink>
+          <FooterLink to="/legal/cookies">Cookies</FooterLink>
+          <FooterLink to="/legal/security">Seguridad</FooterLink>
+        </FooterCol>
+      </div>
+
+      {/* ----------------------------- BOTTOM BAR ------------------------------ */}
+      <div className="border-t border-gray-700">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-6 px-6 py-8 text-sm sm:flex-row">
+          {/* Copy */}
+          <p className="text-gray-400">
+            © {year} Rental‑MVP. Todos los derechos reservados.
+          </p>
+
+          {/* Social */}
+          <div className="flex gap-4">
+            <SocialLink
+              href="https://github.com/juanjoarlandisg25"
+              label="GitHub"
+              icon={FaGithub}
+            />
+            <SocialLink
+              href="https://linkedin.com"
+              label="LinkedIn"
+              icon={FaLinkedin}
+            />
+            <SocialLink
+              href="https://twitter.com"
+              label="Twitter"
+              icon={FaTwitter}
+            />
+            <SocialLink
+              href="https://instagram.com"
+              label="Instagram"
+              icon={FaInstagram}
+            />
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ------------------------- Helpers & Sub‑components ------------------------ */
+function FooterCol({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
+        {title}
+      </h3>
+      <nav className="space-y-2 text-sm">{children}</nav>
+    </div>
+  );
+}
+
+function FooterLink({
+  to,
+  children,
+}: {
+  to: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className="transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function SocialLink({
+  href,
+  label,
+  icon: Icon,
+}: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <a
+      href={href}
+      title={label}
+      className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <Icon className="h-5 w-5" />
+      <span className="sr-only">{label}</span>
+    </a>
+  );
+}
+
+
+--- frontend/src/components/layout/Header.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/layout/Header.tsx                                          */
+/* -------------------------------------------------------------------------- */
+import { Link, NavLink } from 'react-router-dom';
+import { Disclosure, Transition } from '@headlessui/react';
+import {
+  Bars3Icon,
+  XMarkIcon,
+  MoonIcon,
+  SunIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
+import logo from '../../assets/logo.png';
+import { useAuth } from '../../hooks/useAuth';
+import { useEffect, useState } from 'react';
+
+/* ------------------------------ Tema (clase .dark) ------------------------- */
+function ThemeToggle() {
+  const [dark, setDark] = useState(
+    () => document.documentElement.classList.contains('dark')
+  );
+
+  /* persiste en localStorage para siguientes visitas */
+  useEffect(() => {
+    const cls = document.documentElement.classList;
+    dark ? cls.add('dark') : cls.remove('dark');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  return (
+    <button
+      title="Cambiar tema"
+      onClick={() => setDark(!dark)}
+      className="rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+    >
+      {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+      <span className="sr-only">Cambiar tema</span>
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 Header                                     */
+/* -------------------------------------------------------------------------- */
+export default function Header() {
+  const { token, logout } = useAuth();
+
+  const links = token
+    ? [
+        { to: '/dashboard', label: 'Dashboard' },
+        { to: '/dashboard#add', label: 'Publicar', cta: true },
+        { label: 'Salir', action: logout },
+      ]
+    : [
+        { to: '/login', label: 'Entrar' },
+        { to: '/register', label: 'Crear cuenta', cta: true },
+      ];
+
+  /* ---------- efecto de fondo blur‑>sólido al hacer scroll ---------- */
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <Disclosure
+      as="header"
+      className={`sticky top-0 z-40 w-full transition-colors ${
+        scrolled
+          ? 'bg-white/90 shadow-sm dark:bg-gray-900/90'
+          : 'bg-white/60 dark:bg-gray-900/60'
+      } backdrop-blur supports-backdrop-blur:bg-white/40`}
+    >
+      {({ open }) => (
+        <>
+          {/* ----------------------------- Barra principal ----------------------------- */}
+          <div className="container mx-auto flex items-center justify-between py-3 md:py-4">
+            {/* Logo */}
+            <Link to="/" aria-label="Inicio" className="flex items-center gap-2">
+              <img
+                src={logo}
+                alt="Logo Rental‑MVP"
+                className="h-10 w-auto select-none md:h-12"
+                decoding="async"
+              />
+              <span className="sr-only">Rental‑MVP</span>
+            </Link>
+
+            {/* Navegación escritorio */}
+            <nav className="hidden items-center gap-8 text-sm font-semibold md:flex">
+              {links.map(({ to, label, action, cta }) =>
+                action ? (
+                  <button
+                    key={label}
+                    onClick={action}
+                    className="transition-colors hover:text-brand dark:hover:text-brand"
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <NavLink
+                    key={label}
+                    to={to!}
+                    className={({ isActive }) =>
+                      [
+                        'transition-colors hover:text-brand',
+                        isActive ? 'text-brand' : '',
+                        cta
+                          ? 'rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-hover dark:bg-brand-dark dark:hover:bg-brand-hover-dark'
+                          : '',
+                      ].join(' ')
+                    }
+                  >
+                    {label}
+                  </NavLink>
+                )
+              )}
+              <ThemeToggle />
+            </nav>
+
+            {/* Botón hamburguesa móvil */}
+            <div className="flex items-center gap-2 md:hidden">
+              <ThemeToggle />
+              <Disclosure.Button
+                aria-label="Abrir menú"
+                className="rounded-md p-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {open ? (
+                  <XMarkIcon className="h-6 w-6" />
+                ) : (
+                  <Bars3Icon className="h-6 w-6" />
+                )}
+              </Disclosure.Button>
+            </div>
+          </div>
+
+          {/* ----------------------------- Panel móvil ------------------------------ */}
+          <Transition
+            show={open}
+            enter="transition duration-150 ease-out"
+            enterFrom="opacity-0 -translate-y-2"
+            enterTo="opacity-100 translate-y-0"
+            leave="transition duration-100 ease-in"
+            leaveFrom="opacity-100 translate-y-0"
+            leaveTo="opacity-0 -translate-y-2"
+          >
+            <Disclosure.Panel className="border-t border-gray-200 bg-white/95 px-4 pb-6 dark:border-gray-700 dark:bg-gray-900/95 md:hidden">
+              <nav className="flex flex-col gap-4 pt-6 text-base font-medium">
+                {links.map(({ to, label, action, cta }) =>
+                  action ? (
+                    <button
+                      key={label}
+                      onClick={action}
+                      className="text-left transition-colors hover:text-brand"
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <NavLink
+                      key={label}
+                      to={to!}
+                      className={({ isActive }) =>
+                        [
+                          'transition-colors hover:text-brand',
+                          isActive ? 'text-brand' : '',
+                          cta
+                            ? 'rounded-md bg-brand px-4 py-2 text-white shadow hover:bg-brand-hover dark:bg-brand-dark dark:hover:bg-brand-hover-dark'
+                            : '',
+                        ].join(' ')
+                      }
+                    >
+                      {label}
+                    </NavLink>
+                  )
+                )}
+              </nav>
+            </Disclosure.Panel>
+          </Transition>
+        </>
+      )}
+    </Disclosure>
+  );
+}
+
+
+--- frontend/src/components/Home/FAQ.tsx ---
+/* src/components/Home/FAQ.tsx */
+import { Disclosure, Transition } from '@headlessui/react';  // +Transition
+import { ChevronUpIcon } from '@heroicons/react/24/outline';
+import Container from '../shared/Container';
+
+const FAQS = [
+  ['¿Cómo se gestionan los pagos?', 'Usamos Stripe Connect para retener la fianza y liberar el pago una vez devuelto el ítem.'],
+  ['¿Qué pasa si mi herramienta se daña?', 'Dispones de un seguro opcional a todo riesgo y sistema de valoraciones para vetar a malos usuarios.'],
+  ['¿Puedo cancelar una reserva?', 'Sí, hasta 12 h antes sin penalización.'],
+  ['¿Hay comisión?', 'Solo cobramos un 8 % al propietario cuando se confirma el alquiler.']
+];
+
+export default function FAQ() {
+  return (
+    <section className="bg-gray-50 py-16">
+      <Container>
+        <h2 className="mb-8 text-center text-3xl font-bold">Preguntas frecuentes</h2>
+
+        <div className="mx-auto max-w-3xl space-y-4">
+          {FAQS.map(([q, a]) => (
+            <Disclosure key={q}>
+              {({ open }) => (
+                <>
+                  <Disclosure.Button className="flex w-full items-center justify-between rounded-md bg-white px-4 py-3 text-left text-sm font-medium shadow transition-colors hover:bg-gray-50">
+                    {q}
+                    <ChevronUpIcon
+                      className={`h-5 w-5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+                    />
+                  </Disclosure.Button>
+                  <Transition
+                    show={open}
+                    enter="transition duration-200 ease-out"
+                    enterFrom="transform scale-y-95 opacity-0"
+                    enterTo="transform scale-y-100 opacity-100"
+                    leave="transition duration-150 ease-in"
+                    leaveFrom="transform scale-y-100 opacity-100"
+                    leaveTo="transform scale-y-95 opacity-0"
+                  >
+                    <Disclosure.Panel className="px-4 pt-2 pb-4 text-sm text-gray-600">
+                      {a}
+                    </Disclosure.Panel>
+                  </Transition>
+                </>
+              )}
+            </Disclosure>
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+--- frontend/src/components/Home/Stats.tsx ---
+/* src/components/Home/Stats.tsx */
+import { useEffect, useRef, useState } from 'react';
+import Container from '../shared/Container';
+
+const DATA = [
+  { label: 'Ítems publicados', value: 3124 },
+  { label: 'Usuarios registrados', value: 857 },
+  { label: '€ ahorrados', value: 24367 }
+];
+
+export default function Stats() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => e.isIntersecting && setVisible(true),
+      { threshold: 0.4 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <section ref={ref} className="bg-white py-12">
+      <Container>
+        <div className="grid gap-8 sm:grid-cols-3">
+          {DATA.map(({ label, value }) => (
+            <div key={label} className="text-center">
+              <p
+                className="text-4xl font-extrabold text-brand"
+                style={visible ? { '--target': value, animation: 'count 2s ease-out forwards' } as React.CSSProperties : {}}
+              >
+                {visible ? '' : '0'}
+              </p>
+              <p className="mt-2 text-sm font-medium text-gray-600">{label}</p>
+            </div>
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+--- frontend/src/components/Home/LogoCloud.tsx ---
+/* src/components/Home/LogoCloud.tsx */
+import Container from '../shared/Container';
+
+const LOGOS = [
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=Bosch',
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=Makita',
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=Black+%26+Decker',
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=Dewalt',
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=GoPro',
+  'https://dummyimage.com/160x60/cccccc/ffffff?text=Xiaomi'
+];
+
+export default function LogoCloud() {
+  return (
+    <section className="bg-gray-50 py-12">
+      <Container>
+        <div className="grid grid-cols-2 items-center gap-8 opacity-70 sm:grid-cols-3 lg:grid-cols-6">
+          {LOGOS.map(src => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              className="mx-auto h-12 w-auto object-contain grayscale transition-all duration-300 hover:grayscale-0 hover:scale-105"
+              loading="lazy"
+            />
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+--- frontend/src/components/Home/Testimonials.tsx ---
+/* src/components/Home/Testimonials.tsx */
+import Container from '../shared/Container';
+
+const TESTIMONIALS = [
+  {
+    name: 'Laura P.',
+    text: 'Alquilé mi cámara reflex y pagué las vacaciones. ¡Súper fácil!',
+    avatar: 'https://source.unsplash.com/48x48/?woman,face'
+  },
+  {
+    name: 'Carlos G.',
+    text: 'Encontré un taladro a 5 € y no tuve que comprar uno nuevo.',
+    avatar: 'https://source.unsplash.com/48x48/?man,face'
+  },
+  {
+    name: 'Marta S.',
+    text: 'Me encanta la seguridad del pago con fianza. Repetiré.',
+    avatar: 'https://source.unsplash.com/48x48/?lady,face'
+  }
+];
+
+export default function Testimonials() {
+  return (
+    <section className="bg-white py-16">
+      <Container>
+        <h2 className="mb-10 text-center text-3xl font-bold">Historias reales</h2>
+
+        <div className="grid gap-6 md:grid-cols-3">  {/* NEW: Grid en lugar de scroll */}
+          {TESTIMONIALS.map(t => (
+            <article
+              key={t.name}
+              className="rounded-xl bg-white p-6 shadow-card transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src={t.avatar}
+                  alt=""
+                  className="h-10 w-10 rounded-full object-cover"
+                  loading="lazy"
+                />
+                <p className="font-semibold">{t.name}</p>
+              </div>
+              <p className="mt-4 text-sm text-gray-600">“{t.text}”</p>
+            </article>
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+--- frontend/src/components/filters/FiltersSidebar.tsx ---
+import { Disclosure } from '@headlessui/react';
+import useCategories, { Category } from '../../features/categories/useCategories';
+
+type Filters = {
+  name?: string;
+  min_price?: number;
+  max_price?: number;
+  categories?: number[];
+  order?: 'price_asc' | 'price_desc' | 'name';
+};
+
+type Props = {
+  value: Filters;
+  onChange: (f: Filters) => void;
+  onReset: () => void;
+};
+
+export default function FiltersSidebar({ value, onChange, onReset }: Props) {
+  const { data: cats } = useCategories();
+
+  const toggleCat = (id: number) => {
+    const list = new Set(value.categories ?? []);
+    list.has(id) ? list.delete(id) : list.add(id);
+    onChange({ ...value, categories: [...list] });
+  };
+
+  return (
+    <div className="space-y-6 w-full md:w-60 lg:w-72">
+      {/* Search */}
+      <input
+        placeholder="Buscar…"
+        className="form-input w-full"
+        value={value.name ?? ''}
+        onChange={e => onChange({ ...value, name: e.target.value || undefined })}
+      />
+
+      {/* Price */}
+      <Disclosure defaultOpen>
+        {({ open }) => (
+          <>
+            <Disclosure.Button className="flex w-full justify-between text-sm font-semibold">
+              Precio {open ? '−' : '+'}
+            </Disclosure.Button>
+            <Disclosure.Panel className="mt-3 space-y-2">
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                placeholder="mín"
+                className="form-input w-full"
+                value={value.min_price ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...value,
+                    min_price: e.target.value ? Number(e.target.value) : undefined
+                  })
+                }
+              />
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                placeholder="máx"
+                className="form-input w-full"
+                value={value.max_price ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...value,
+                    max_price: e.target.value ? Number(e.target.value) : undefined
+                  })
+                }
+              />
+            </Disclosure.Panel>
+          </>
+        )}
+      </Disclosure>
+
+      {/* Categories */}
+      <Disclosure defaultOpen>
+        {({ open }) => (
+          <>
+            <Disclosure.Button className="flex w-full justify-between text-sm font-semibold">
+              Categorías {open ? '−' : '+'}
+            </Disclosure.Button>
+            <Disclosure.Panel className="mt-3 flex flex-wrap gap-2">
+              {cats.map((c: Category) => {
+                const active = value.categories?.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => toggleCat(c.id)}
+                    className={
+                      active
+                        ? 'rounded-full bg-brand px-3 py-0.5 text-xs font-medium text-white'
+                        : 'rounded-full border px-3 py-0.5 text-xs text-gray-600'
+                    }
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </Disclosure.Panel>
+          </>
+        )}
+      </Disclosure>
+
+      {/* Order */}
+      <select
+        className="form-select w-full"
+        value={value.order ?? ''}
+        onChange={e =>
+          onChange({
+            ...value,
+            order: e.target.value ? (e.target.value as Filters['order']) : undefined
+          })
+        }
+      >
+        <option value="">Ordenar por…</option>
+        <option value="price_asc">Precio ↑</option>
+        <option value="price_desc">Precio ↓</option>
+        <option value="name">Nombre</option>
+      </select>
+
+      <button onClick={onReset} className="btn--ghost w-full">
+        Limpiar filtros
+      </button>
+    </div>
+  );
+}
 
 

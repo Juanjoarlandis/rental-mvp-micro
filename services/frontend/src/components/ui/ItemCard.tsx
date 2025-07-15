@@ -8,7 +8,7 @@ import clsx from "clsx";
 import { Item } from "../../features/items/useItems";
 import { resolveImage } from "../../utils";
 import LazyImage from "./LazyImage";
-import ItemDetailModal from "./ItemDetailModal";
+import ProductDetailModal from "../../features/items/item-detail/ProductDetailModal";
 
 export default function ItemCard({ item }: { item: Item }) {
   const [open, setOpen] = useState(false);
@@ -79,7 +79,12 @@ export default function ItemCard({ item }: { item: Item }) {
       </article>
 
       {/* ---------- Modal de detalle ---------- */}
-      <ItemDetailModal open={open} onClose={() => setOpen(false)} item={item} />
+      {/*  ⬇️  Enviamos el ID correcto                                  */}
+      <ProductDetailModal
+        open={open}
+        onClose={() => setOpen(false)}
+        itemId={item.id}
+      />
     </>
   );
 }
