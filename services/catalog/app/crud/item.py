@@ -108,6 +108,13 @@ def create_item(db: Session, item_in: ItemCreate, owner_username: str) -> Item:
         name=item_in.name,
         description=item_in.description,
         price_per_h=item_in.price_per_h,
+        compare_at_price=item_in.compare_at_price,
+        sku=item_in.sku,
+        stock=item_in.stock,
+        weight_kg=item_in.weight_kg,
+        shipping_type=item_in.shipping_type,
+        condition=item_in.condition,
+        hashtags=item_in.hashtags,
         image_url=main,
         owner_username=owner_username,
     )
@@ -124,7 +131,9 @@ def create_item(db: Session, item_in: ItemCreate, owner_username: str) -> Item:
 
 
 def update_item(db: Session, db_item: Item, item_in: ItemUpdate) -> Item:
-    data = item_in.model_dump(exclude_unset=True, exclude={"categories", "image_urls"})
+    data = item_in.model_dump(
+        exclude_unset=True, exclude={"categories", "image_urls"}
+    )
     for k, v in data.items():
         setattr(db_item, k, v)
 

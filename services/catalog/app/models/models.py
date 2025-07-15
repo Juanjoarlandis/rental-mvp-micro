@@ -11,7 +11,7 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.orm import relationship
-
+from sqlalchemy.dialects.postgresql import ARRAY
 from .database import Base
 
 # relación N:M items–categories
@@ -49,12 +49,16 @@ class Item(Base):
     description = Column(String)
     price_per_h = Column(Float, nullable=False)
 
-    # destacado (legacy)
-    image_url = Column(String)
+    compare_at_price = Column(Float)                            # 🆕
+    sku = Column(String, unique=True)                           # 🆕
+    stock = Column(Integer, default=1)                          # 🆕
+    weight_kg = Column(Float)                                   # 🆕
+    shipping_type = Column(String(20), default="free")          # 🆕 "free" | "local_pickup" | "paid"
+    condition = Column(String(10), default="new")               # 🆕 "new"  | "used"
+    hashtags = Column(ARRAY(String))                            # 🆕  TEXT[]
 
-    # ← vínculo al propietario (micro-servicio auth)
+    image_url = Column(String)           # destacado (legacy)
     owner_username = Column(String, index=True, nullable=False)
-
     available = Column(Boolean, default=True)
 
     # relaciones

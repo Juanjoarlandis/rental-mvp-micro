@@ -6,7 +6,7 @@ import SkeletonCard from '../../components/ui/SkeletonCard';
 import FiltersSidebar from '../../components/filters/FiltersSidebar';
 import { useItems } from './useItems';
 import { useAuth } from '../../hooks/useAuth';
-import AddItemModal from './AddItemModal';
+import AddItemModal from './add-product-modal/AddProductModal';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 /* -------------------------------------------------- */
