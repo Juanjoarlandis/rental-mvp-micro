@@ -16,8 +16,14 @@ module.exports = {
         extend: {
             fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
             colors: {
-                brand: { DEFAULT: '#0d6efd', hover: '#0b5ed7' },
-                surface: '#ffffff'
+                brand: {
+                    DEFAULT: '#0d6efd',
+                    hover: '#0b5ed7',
+                    dark: '#014bb8',  // Darkened version of DEFAULT
+                    'hover-dark': '#074196'  // Darkened version of hover
+                },
+                surface: '#ffffff',
+                'surface-dark': '#1f2937'  // Optional dark surface if needed elsewhere
             },
             boxShadow: {
                 card: '0 1px 3px rgba(0,0,0,.08)',

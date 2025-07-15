@@ -1,8 +1,10 @@
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/ItemDetailModal.tsx                                     */
-/*  – Integra reserva vía micro-servicio **rentals** + Stripe                 */
+/*  – Integra reserva vía micro-servicio **rentals**                          */
+/*    • logos de pago encima del CTA                                          */
+/*    • botón «Reservar ahora» XL que crea el alquiler                        */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState, useEffect } from "react";  // ### UPDATED: +useEffect
+import { Fragment, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
@@ -15,22 +17,15 @@ import {
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { FaFacebookF, FaTwitter, FaWhatsapp } from "react-icons/fa";
+import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
 import { Item } from "../../features/items/useItems";
-import { reserve } from "../../features/rentals/reserve";
+import { createRental } from "../../features/rentals/createRental";
 import { useAuth } from "../../hooks/useAuth";
 import { resolveImage } from "../../utils";
-
 import LazyImage from "./LazyImage";
-import PaymentModal from "./PaymentModal";
-
-// ### NEW: Imports para calendario
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
-import { format, isWithinInterval, parseISO, isBefore, isAfter } from 'date-fns';
-import { api } from '../../api';  // Para fetch de availability
 
 /* ------------------- helpers (Rating, Feature, Description) --------------- */
 
@@ -65,7 +60,7 @@ const Feature = ({
 const Description = ({ text }: { text: string }) => {
   const bullets = text
     .split(/(?:\u2022|\n)/) // • o salto de línea
-    .map(t => t.trim())
+    .map((t) => t.trim())
     .filter(Boolean);
 
   if (bullets.length > 1) {
@@ -112,80 +107,34 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     Velocidad: "0-2 800 rpm",
   };
 
-  /* ---------- ### NEW: Calendario y rangos ocupados ---------- */
-  const [occupiedRanges, setOccupiedRanges] = useState<{ start_at: string; end_at: string }[]>([]);
-  const [selectedRange, setSelectedRange] = useState<{ from: Date; to?: Date } | undefined>();
-  const [loadingRanges, setLoadingRanges] = useState(true);
-
-  useEffect(() => {
-    if (open && item.id) {
-      // Fetch rangos ocupados de rentals
-      api.get(`/rentals/item/${item.id}/availability`)
-        .then(res => {
-          setOccupiedRanges(res.data);
-          setLoadingRanges(false);
-        })
-        .catch(() => {
-          toast.error('No se pudo cargar la disponibilidad');
-          setLoadingRanges(false);
-        });
-    }
-  }, [open, item.id]);
-
-  // Convertir occupiedRanges a Date ranges para DayPicker
-  const disabledIntervals = occupiedRanges.map(r => ({
-    from: parseISO(r.start_at),
-    to: parseISO(r.end_at),
-  }));
-
-  // Custom onSelect: Validar no overlap con disabled
-  const handleSelect = (range: { from: Date; to?: Date } | undefined) => {
-    if (!range || !range.to) {
-      setSelectedRange(range);
-      return;
-    }
-
-    // Chequeo de overlap
-    const hasOverlap = disabledIntervals.some(interval => {
-      return (
-        isWithinInterval(range.from, interval) ||
-        isWithinInterval(range.to, interval) ||
-        (isBefore(range.from, interval.from) && isAfter(range.to, interval.to))
-      );
-    });
-
-    if (hasOverlap) {
-      toast.error('El rango seleccionado incluye fechas no disponibles. Por favor, elige otro.');
-      setSelectedRange(undefined);  // Reset
-    } else {
-      setSelectedRange(range);
-    }
-  };
-
-  /* ---------- reserva ---------- */
+  /* ---------- reserva rentals ---------- */
   const { token } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const handleReserve = async () => {
-    if (!token) return toast.error("Debes iniciar sesión primero");
-    if (!item.available)
-      return toast.error("Este ítem no está disponible actualmente");
-    if (!selectedRange?.from || !selectedRange.to)
-      return toast.error("Selecciona un rango de fechas válido");
-
-    try {
-      setLoading(true);
-      const { clientSecret } = await reserve(item.id, selectedRange.from, selectedRange.to); // ### UPDATED: Pasa fechas
-      setLoading(false);
-      setClientSecret(clientSecret); // abre modal de pago
-    } catch (err: any) {
-      setLoading(false);
+  const mutation = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
+      return createRental(item.id, now.toISOString(), plus1h.toISOString());
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Reserva creada ✔️  Fianza retenida: ${r.deposit.toFixed(2)} €`
+      );
+      onClose();
+    },
+    onError: (err: any) => {
       const msg =
         err?.response?.data?.detail ??
         "No se pudo reservar, inténtalo más tarde.";
       toast.error(msg);
-    }
+    },
+  });
+
+  const handleReserve = () => {
+    if (!token) return toast.error("Debes iniciar sesión primero");
+    if (!item.available)
+      return toast.error("Este ítem no está disponible actualmente");
+    mutation.mutate();
   };
 
   /* ---------------------------------------------------------------------- */
@@ -294,7 +243,7 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
 
                   {!!item.categories?.length && (
                     <div className="flex flex-wrap gap-2">
-                      {item.categories.map(c => (
+                      {item.categories.map((c) => (
                         <span
                           key={c.id}
                           className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
@@ -335,30 +284,6 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     />
                   </ul>
 
-                  {/* ### NEW: Calendario de disponibilidad */}
-                  <div className="mt-4">
-                    <h3 className="text-lg font-medium mb-2">Selecciona fechas</h3>
-                    {loadingRanges ? (
-                      <p className="text-gray-500">Cargando disponibilidad...</p>
-                    ) : (
-                      <DayPicker
-                        mode="range"
-                        selected={selectedRange}
-                        onSelect={handleSelect}  // Custom handler con validación
-                        disabled={disabledIntervals}
-                        numberOfMonths={2}
-                        modifiers={{ booked: disabledIntervals }}
-                        modifiersStyles={{ booked: { backgroundColor: 'rgba(255, 0, 0, 0.2)', color: 'red' } }}  // Estilo para ocupados
-                        fromDate={new Date()}  // No permite fechas pasadas
-                      />
-                    )}
-                    {selectedRange?.from && selectedRange.to && (
-                      <p className="mt-2 text-sm text-gray-700">
-                        Reservando desde {format(selectedRange.from, 'PPP')} hasta {format(selectedRange.to, 'PPP')}
-                      </p>
-                    )}
-                  </div>
-
                   {/* redes */}
                   <div className="mt-3 flex gap-4">
                     <Social icon={FaFacebookF} label="Facebook" />
@@ -371,27 +296,27 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     <img
                       src="/src/assets/payments/visa.svg"
                       alt="Visa"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                     <img
                       src="/src/assets/payments/mastercard.svg"
                       alt="Mastercard"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                     <img
                       src="/src/assets/payments/paypal.svg"
                       alt="PayPal"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                   </div>
 
                   {/* CTA – XL */}
                   <button
                     onClick={handleReserve}
-                    disabled={loading || loadingRanges || !selectedRange?.to}
-                    className="btn mt-4 w-full py-4 text-lg lg:max-w-xl"
+                    disabled={mutation.isLoading}
+                    className="btn mt-4 w-full lg:max-w-xl py-4 text-lg"
                   >
-                    {loading ? (
+                    {mutation.isLoading ? (
                       <>
                         <ArrowPathIcon className="mr-3 h-6 w-6 animate-spin" />
                         Reservando…
@@ -406,17 +331,6 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
           </Transition.Child>
         </div>
       </Dialog>
-
-      {/* ─────────── Modal de pago Stripe ─────────── */}
-      <PaymentModal
-        open={Boolean(clientSecret)}
-        clientSecret={clientSecret ?? ""}
-        onClose={() => setClientSecret(null)}
-        onSuccess={() => {
-          toast.success("Reserva confirmada y fianza retenida 🎉");
-          onClose();
-        }}
-      />
     </Transition>
   );
 }

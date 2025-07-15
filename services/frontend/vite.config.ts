@@ -15,5 +15,10 @@ export default defineConfig({
       "/api/payments":   "https://localhost:8005",
       "/uploads":        "https://localhost:8004"
     }
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true  // This forces proper transformation of mixed ESM/CJS modules like clsx
+    }
   }
 });

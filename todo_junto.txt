@@ -89,6 +89,11 @@ export default defineConfig({
       "/api/payments":   "https://localhost:8005",
       "/uploads":        "https://localhost:8004"
     }
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true  // This forces proper transformation of mixed ESM/CJS modules like clsx
+    }
   }
 });
 
@@ -233,8 +238,14 @@ module.exports = {
         extend: {
             fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
             colors: {
-                brand: { DEFAULT: '#0d6efd', hover: '#0b5ed7' },
-                surface: '#ffffff'
+                brand: {
+                    DEFAULT: '#0d6efd',
+                    hover: '#0b5ed7',
+                    dark: '#014bb8',  // Darkened version of DEFAULT
+                    'hover-dark': '#074196'  // Darkened version of hover
+                },
+                surface: '#ffffff',
+                'surface-dark': '#1f2937'  // Optional dark surface if needed elsewhere
             },
             boxShadow: {
                 card: '0 1px 3px rgba(0,0,0,.08)',
@@ -249,7 +260,6 @@ module.exports = {
         require('@tailwindcss/container-queries') // 🆕
     ]
 };
-
 
 --- frontend/src/App.tsx ---
 // src/App.tsx
@@ -568,26 +578,44 @@ export function useStripe() {
 /* ---------- BASE ---------- */
 @layer base {
   html { @apply scroll-smooth; }
-  body { @apply bg-gray-50 text-gray-800 antialiased font-sans; }
+  body { 
+    @apply bg-gray-50 text-gray-800 antialiased font-sans dark:bg-gray-900 dark:text-gray-100;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+CiAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC45IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+CiAgPC9maWx0ZXI+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI25vaXNlRmlsdGVyKSIgb3BhY2l0eT0iMC4xIi8+ICA8IS0tPC9zdmc+");
+    background-repeat: repeat;
+    background-blend-mode: overlay;  /* 🆕 Blend para profundidad sin afectar contenido */
+  }
 }
 
 /* ---------- COMPONENTS ---------- */
 @layer components {
-  /* Botones */
-  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md disabled:opacity-60 active:scale-95; }  /* +hover shadow, active scale */
-  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm active:scale-95; }
+  /* Botones - REFACTORED: Añadidas variants (secondary, danger, loading), loading state con spinner, animaciones (hover scale, active bounce), focus ring mejorado, dark mode. */
+  .btn        { 
+    @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; 
+  }  
+  .btn--secondary { 
+    @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; 
+  }
+  .btn--danger { 
+    @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; 
+  }
+  .btn--ghost { 
+    @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; 
+  }
+  .btn--loading { 
+    @apply cursor-wait; /* +spinner en componentes */
+  }
 
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
-  .badge--ok     { @apply badge bg-green-100 text-green-800; }
-  .badge--danger { @apply badge bg-red-100 text-red-800; }
+  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }  /* 🆕 Dark variants */
+  .badge--danger { @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
 
   /* Campos select genérico */
-  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200; }
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }  /* 🆕 Dark */
 
   /* Toast */
-  .toast-success { @apply bg-green-600 text-white; }
-  .toast-error   { @apply bg-red-600 text-white; }
+  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }  /* 🆕 Dark */
+  .toast-error   { @apply bg-red-600 text-white dark:bg-red-700; }
 
   /* Títulos fluidos (ejemplo h1) */
   h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); } /* 36 px → 56 px aprox */
@@ -603,14 +631,21 @@ export function useStripe() {
   /* Oculta scrollbar (usarlo con cuidado) */
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
-  /* Animaciones on-scroll */
-  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
-  .fade-in.visible { opacity: 1; transform: translateY(0); }
+  /* Animaciones on-scroll - REFACTORED: Añadida scale para más dinamismo */
+  .fade-in { opacity: 0; transform: translateY(20px) scale(0.98); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+  .fade-in.visible { opacity: 1; transform: translateY(0) scale(1); }
 
   /* Count-up para stats */
   .count-up { counter-reset: num var(--num); }
   .count-up::after { content: counter(num); }
   @keyframes count { from { --num: 0; } to { --num: var(--target); } }
+}
+
+/* 🆕 Media query para fine-tune dark mode: noise menos intenso */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-blend-mode: soft-light;  /* 🆕 Suaviza noise en dark para no "claror" inverso */
+  }
 }
 
 --- frontend/src/features/auth/forgot.ts ---
@@ -1722,7 +1757,7 @@ import {
   UsersIcon,        // NEW
   GlobeAltIcon,     // NEW
 } from '@heroicons/react/24/solid';
-import { useEffect, useRef } from 'react';  // NEW: Para animaciones
+import { useEffect, useRef, useState } from 'react';  // NEW: Para animaciones
 import clsx from 'clsx';
 
 import Container from '../components/shared/Container';
@@ -1762,10 +1797,10 @@ const Benefits = () => {
       <Container>
         <div ref={ref} className="grid gap-8 md:grid-cols-3">
           {BENEFITS.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="fade-in text-center space-y-2 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">
+            <div key={title} className="fade-in text-center space-y-2 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-gray-800 dark:shadow-gray-700">  {/* 🆕 Dark variants */}
               <Icon className="mx-auto h-12 w-12 text-brand" />
-              <h3 className="text-xl font-semibold">{title}</h3>
-              <p className="text-gray-600">{desc}</p>
+              <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
+              <p className="text-gray-600 dark:text-gray-300">{desc}</p>
             </div>
           ))}
         </div>
@@ -1814,18 +1849,23 @@ export default function Home() {
 
   return (
     <>
-      {/* ---------- HERO (mejorado: gradient bg, animación fade-in) ---------- */}
-      <section className="relative isolate overflow-hidden bg-gradient-to-br from-brand to-brand-hover text-white py-32">  {/* +gradient */}
-        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl animate-pulse" />  {/* +animate-pulse */}
+      {/* ---------- HERO (mejorado: gradient + overlay image, dark mode, más contraste) ---------- */}
+      <section 
+        className="relative isolate overflow-hidden py-32 text-white dark:text-gray-100"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), transparent), url("https://source.unsplash.com/random/1920x1080/?tools,renting,community&w=1920") no-repeat center/cover',  // 🆕 Optimizado con ?w=1920
+        }}
+      >
+        <span className="pointer-events-none absolute -top-16 left-1/2 -z-10 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-white/10 blur-3xl animate-pulse dark:bg-gray-800/10" />  {/* 🆕 Dark variant */}
 
         <Container>
           <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 py-28 text-center fade-in visible">  {/* +fade-in */}
             <h1 className="max-w-3xl text-balance text-5xl font-extrabold leading-tight md:text-6xl">  {/* +md:text-6xl */}
               Dónde tus cosas <br className="hidden sm:inline" />
-              <span className="text-white/80">cambian de mano</span>
+              <span className="text-white/80 dark:text-gray-300/80">cambian de mano</span>
             </h1>
 
-            <p className="max-w-xl text-lg/relaxed text-white/90">
+            <p className="max-w-xl text-lg/relaxed text-white/90 dark:text-gray-300">
               Alquila herramientas, gadgets o equipamiento deportivo y monetiza lo
               que ya tienes. ¡Conecta con tu barrio y ahorra al planeta!
             </p>
@@ -1842,54 +1882,54 @@ export default function Home() {
           </div>
         </Container>
 
-        {/* wave separator (más suave) */}
+        {/* wave separator (más suave, dark mode) */}
         <svg
           aria-hidden
           viewBox="0 0 1440 120"
-          className="block w-full text-brand"
+          className="block w-full text-brand dark:text-gray-800"  // 🆕 Dark variant
           preserveAspectRatio="none"
         >
           <path
             d="M0,96L48,106.7C96,117,192,139,288,128C384,117,480,75,576,58.7C672,43,768,53,864,74.7C960,96,1056,128,1152,138.7C1248,149,1344,139,1392,133.3L1440,128L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"
-            className="fill-white"
+            className="fill-white dark:fill-gray-900"  // 🆕 Dark fill
           />
         </svg>
       </section>
 
-      {/* ---------- STATS (ya animado) ---------- */}
+      {/* ---------- STATS (ya animado, con dark mode) ---------- */}
       <Stats />
 
-      {/* ---------- LOGO CLOUD (con hover) ---------- */}
+      {/* ---------- LOGO CLOUD (con hover, dark mode) ---------- */}
       <LogoCloud />
 
       {/* ---------- BENEFITS (nueva sección) ---------- */}
       <Benefits />
 
-      {/* ---------- CÓMO FUNCIONA (cards con animaciones secuenciales) ---------- */}
-      <Section title="¿Cómo funciona?">
+      {/* ---------- CÓMO FUNCIONA (cards con animaciones secuenciales, alterna bg) ---------- */}
+      <Section title="¿Cómo funciona?" className="bg-gray-100 dark:bg-gray-800">  {/* 🆕 Alterna bg para contraste */}
         <Container>
           <div ref={stepsRef} className="grid gap-12 md:grid-cols-3">
             {STEPS.map(({ title, desc, icon: Icon }) => (
-              <div key={title} className="fade-in text-center space-y-4 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg">  {/* +cards */}
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10">
+              <div key={title} className="fade-in text-center space-y-4 p-6 rounded-lg bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-gray-700 dark:shadow-gray-800">  {/* 🆕 Dark */}
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 dark:bg-brand/20">
                   <Icon className="h-6 w-6 text-brand" />
                 </div>
-                <h3 className="text-xl font-semibold">{title}</h3>
-                <p className="text-gray-600">{desc}</p>
+                <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
+                <p className="text-gray-600 dark:text-gray-300">{desc}</p>
               </div>
             ))}
           </div>
         </Container>
       </Section>
 
-      {/* ---------- TESTIMONIALS (mejorado: grid responsivo) ---------- */}
-      <Testimonials />
+      {/* ---------- TESTIMONIALS (mejorado: grid responsivo, alterna bg) ---------- */}
+      <Testimonials className="bg-white dark:bg-gray-900" />  {/* 🆕 Dark */}
 
-      {/* ---------- FAQ (con iconos y transiciones) ---------- */}
-      <FAQ />
+      {/* ---------- FAQ (con iconos y transiciones, alterna bg con radial-gradient en CTA) ---------- */}
+      <FAQ className="bg-gray-100 dark:bg-gray-800" />  {/* 🆕 Alterna bg (gray-100 para menos claror) */}
 
-      {/* ---------- CTA FINAL (con animación) ---------- */}
-      <section className="bg-brand py-16 text-center text-white fade-in">
+      {/* ---------- CTA FINAL (con animación, radial-gradient sutil) ---------- */}
+      <section className="bg-brand py-16 text-center text-white fade-in relative" style={{ backgroundImage: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent)' }}>  {/* 🆕 Radial-gradient más visible (0.15) para profundidad */}
         <Container>
           <h2 className="mb-6 text-3xl font-bold">
             ¿Listo para estrenar ingresos extra?
@@ -2460,9 +2500,11 @@ export default function SearchBar({ onSubmit }: Props) {
 --- frontend/src/components/ui/ItemDetailModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/ItemDetailModal.tsx                                     */
-/*  – Integra reserva vía micro-servicio **rentals** + Stripe                 */
+/*  – Integra reserva vía micro-servicio **rentals**                          */
+/*    • logos de pago encima del CTA                                          */
+/*    • botón «Reservar ahora» XL que crea el alquiler                        */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState, useEffect } from "react";  // ### UPDATED: +useEffect
+import { Fragment, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
@@ -2475,22 +2517,15 @@ import {
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { FaFacebookF, FaTwitter, FaWhatsapp } from "react-icons/fa";
+import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
 import { Item } from "../../features/items/useItems";
-import { reserve } from "../../features/rentals/reserve";
+import { createRental } from "../../features/rentals/createRental";
 import { useAuth } from "../../hooks/useAuth";
 import { resolveImage } from "../../utils";
-
 import LazyImage from "./LazyImage";
-import PaymentModal from "./PaymentModal";
-
-// ### NEW: Imports para calendario
-import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
-import { format, isWithinInterval, parseISO, isBefore, isAfter } from 'date-fns';
-import { api } from '../../api';  // Para fetch de availability
 
 /* ------------------- helpers (Rating, Feature, Description) --------------- */
 
@@ -2525,7 +2560,7 @@ const Feature = ({
 const Description = ({ text }: { text: string }) => {
   const bullets = text
     .split(/(?:\u2022|\n)/) // • o salto de línea
-    .map(t => t.trim())
+    .map((t) => t.trim())
     .filter(Boolean);
 
   if (bullets.length > 1) {
@@ -2572,80 +2607,34 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
     Velocidad: "0-2 800 rpm",
   };
 
-  /* ---------- ### NEW: Calendario y rangos ocupados ---------- */
-  const [occupiedRanges, setOccupiedRanges] = useState<{ start_at: string; end_at: string }[]>([]);
-  const [selectedRange, setSelectedRange] = useState<{ from: Date; to?: Date } | undefined>();
-  const [loadingRanges, setLoadingRanges] = useState(true);
-
-  useEffect(() => {
-    if (open && item.id) {
-      // Fetch rangos ocupados de rentals
-      api.get(`/rentals/item/${item.id}/availability`)
-        .then(res => {
-          setOccupiedRanges(res.data);
-          setLoadingRanges(false);
-        })
-        .catch(() => {
-          toast.error('No se pudo cargar la disponibilidad');
-          setLoadingRanges(false);
-        });
-    }
-  }, [open, item.id]);
-
-  // Convertir occupiedRanges a Date ranges para DayPicker
-  const disabledIntervals = occupiedRanges.map(r => ({
-    from: parseISO(r.start_at),
-    to: parseISO(r.end_at),
-  }));
-
-  // Custom onSelect: Validar no overlap con disabled
-  const handleSelect = (range: { from: Date; to?: Date } | undefined) => {
-    if (!range || !range.to) {
-      setSelectedRange(range);
-      return;
-    }
-
-    // Chequeo de overlap
-    const hasOverlap = disabledIntervals.some(interval => {
-      return (
-        isWithinInterval(range.from, interval) ||
-        isWithinInterval(range.to, interval) ||
-        (isBefore(range.from, interval.from) && isAfter(range.to, interval.to))
-      );
-    });
-
-    if (hasOverlap) {
-      toast.error('El rango seleccionado incluye fechas no disponibles. Por favor, elige otro.');
-      setSelectedRange(undefined);  // Reset
-    } else {
-      setSelectedRange(range);
-    }
-  };
-
-  /* ---------- reserva ---------- */
+  /* ---------- reserva rentals ---------- */
   const { token } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
-  const handleReserve = async () => {
-    if (!token) return toast.error("Debes iniciar sesión primero");
-    if (!item.available)
-      return toast.error("Este ítem no está disponible actualmente");
-    if (!selectedRange?.from || !selectedRange.to)
-      return toast.error("Selecciona un rango de fechas válido");
-
-    try {
-      setLoading(true);
-      const { clientSecret } = await reserve(item.id, selectedRange.from, selectedRange.to); // ### UPDATED: Pasa fechas
-      setLoading(false);
-      setClientSecret(clientSecret); // abre modal de pago
-    } catch (err: any) {
-      setLoading(false);
+  const mutation = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
+      return createRental(item.id, now.toISOString(), plus1h.toISOString());
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Reserva creada ✔️  Fianza retenida: ${r.deposit.toFixed(2)} €`
+      );
+      onClose();
+    },
+    onError: (err: any) => {
       const msg =
         err?.response?.data?.detail ??
         "No se pudo reservar, inténtalo más tarde.";
       toast.error(msg);
-    }
+    },
+  });
+
+  const handleReserve = () => {
+    if (!token) return toast.error("Debes iniciar sesión primero");
+    if (!item.available)
+      return toast.error("Este ítem no está disponible actualmente");
+    mutation.mutate();
   };
 
   /* ---------------------------------------------------------------------- */
@@ -2754,7 +2743,7 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
 
                   {!!item.categories?.length && (
                     <div className="flex flex-wrap gap-2">
-                      {item.categories.map(c => (
+                      {item.categories.map((c) => (
                         <span
                           key={c.id}
                           className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
@@ -2795,30 +2784,6 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     />
                   </ul>
 
-                  {/* ### NEW: Calendario de disponibilidad */}
-                  <div className="mt-4">
-                    <h3 className="text-lg font-medium mb-2">Selecciona fechas</h3>
-                    {loadingRanges ? (
-                      <p className="text-gray-500">Cargando disponibilidad...</p>
-                    ) : (
-                      <DayPicker
-                        mode="range"
-                        selected={selectedRange}
-                        onSelect={handleSelect}  // Custom handler con validación
-                        disabled={disabledIntervals}
-                        numberOfMonths={2}
-                        modifiers={{ booked: disabledIntervals }}
-                        modifiersStyles={{ booked: { backgroundColor: 'rgba(255, 0, 0, 0.2)', color: 'red' } }}  // Estilo para ocupados
-                        fromDate={new Date()}  // No permite fechas pasadas
-                      />
-                    )}
-                    {selectedRange?.from && selectedRange.to && (
-                      <p className="mt-2 text-sm text-gray-700">
-                        Reservando desde {format(selectedRange.from, 'PPP')} hasta {format(selectedRange.to, 'PPP')}
-                      </p>
-                    )}
-                  </div>
-
                   {/* redes */}
                   <div className="mt-3 flex gap-4">
                     <Social icon={FaFacebookF} label="Facebook" />
@@ -2831,27 +2796,27 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
                     <img
                       src="/src/assets/payments/visa.svg"
                       alt="Visa"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                     <img
                       src="/src/assets/payments/mastercard.svg"
                       alt="Mastercard"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                     <img
                       src="/src/assets/payments/paypal.svg"
                       alt="PayPal"
-                      className="h-8 w-auto md:h-10"
+                      className="h-8 md:h-10 w-auto"
                     />
                   </div>
 
                   {/* CTA – XL */}
                   <button
                     onClick={handleReserve}
-                    disabled={loading || loadingRanges || !selectedRange?.to}
-                    className="btn mt-4 w-full py-4 text-lg lg:max-w-xl"
+                    disabled={mutation.isLoading}
+                    className="btn mt-4 w-full lg:max-w-xl py-4 text-lg"
                   >
-                    {loading ? (
+                    {mutation.isLoading ? (
                       <>
                         <ArrowPathIcon className="mr-3 h-6 w-6 animate-spin" />
                         Reservando…
@@ -2866,17 +2831,6 @@ export default function ItemDetailModal({ open, onClose, item }: Props) {
           </Transition.Child>
         </div>
       </Dialog>
-
-      {/* ─────────── Modal de pago Stripe ─────────── */}
-      <PaymentModal
-        open={Boolean(clientSecret)}
-        clientSecret={clientSecret ?? ""}
-        onClose={() => setClientSecret(null)}
-        onSuccess={() => {
-          toast.success("Reserva confirmada y fianza retenida 🎉");
-          onClose();
-        }}
-      />
     </Transition>
   );
 }
@@ -2899,6 +2853,7 @@ function Social({
     </a>
   );
 }
+
 
 --- frontend/src/components/ui/SocialButton.tsx ---
 // src/components/ui/SocialButton.tsx
@@ -2931,24 +2886,24 @@ export default function SocialButton({ icon: Icon, label, provider }: Props) {
 --- frontend/src/components/ui/QuickViewModal.tsx ---
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/QuickViewModal.tsx                                      */
-/*  – permite reservar el ítem vía micro-servicio **rentals** + Stripe        */
+/*  – ahora permite reservar el ítem vía micro-servicio **rentals**           */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import {
   XMarkIcon,
   StarIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
+import { useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 
 import { Item } from "../../features/items/useItems";
-import { reserve } from "../../features/rentals/reserve";
+import { createRental } from "../../features/rentals/createRental";
 import { useAuth } from "../../hooks/useAuth";
 import LazyImage from "./LazyImage";
 import { resolveImage } from "../../utils";
-import PaymentModal from "./PaymentModal";
 
 type Props = {
   open: boolean;
@@ -2969,160 +2924,153 @@ export default function QuickViewModal({ open, onClose, item }: Props) {
 
   /* ─────────── auth + reserva ─────────── */
   const { token } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   /* reserva de **1 h** a partir de “ya” (demo) */
-  const handleReserve = async () => {
-    if (!token) return toast.error("Debes iniciar sesión");
-    if (!item.available)
-      return toast.error("Este ítem no está disponible ahora mismo");
-
-    try {
-      setLoading(true);
-      const { clientSecret } = await reserve(item.id);
-      setLoading(false);
-      setClientSecret(clientSecret); // abre modal Stripe
-    } catch (err: any) {
-      setLoading(false);
+  const reserve = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
+      return createRental(item.id, now.toISOString(), plus1h.toISOString());
+    },
+    onSuccess: data => {
+      toast.success(
+        `Reserva confirmada ✔️  •  Fianza: ${data.deposit.toFixed(2)} €`
+      );
+      onClose();
+    },
+    onError: (err: any) => {
       const msg =
         err?.response?.data?.detail ??
         "No se pudo crear la reserva. Inténtalo más tarde.";
       toast.error(msg);
-    }
+    },
+  });
+
+  const handleReserve = () => {
+    if (!token) return toast.error("Debes iniciar sesión");
+    if (!item.available)
+      return toast.error("Este ítem no está disponible ahora mismo");
+    reserve.mutate();
   };
 
   /* ────────────────── UI ────────────────── */
   return (
-    <>
-      <Transition show={open} as={Fragment}>
-        <Dialog onClose={onClose} className="relative z-50">
-          {/* ---------- Backdrop ---------- */}
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="relative z-50">
+        {/* ---------- Backdrop ---------- */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+        </Transition.Child>
+
+        {/* ---------- Panel ---------- */}
+        <div className="fixed inset-0 grid place-items-center p-4">
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-200"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
+            enterFrom="scale-95 opacity-0"
+            enterTo="scale-100 opacity-100"
             leave="ease-in duration-150"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
+            leaveFrom="scale-100 opacity-100"
+            leaveTo="scale-95 opacity-0"
           >
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
-          </Transition.Child>
+            <Dialog.Panel className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+              {/* ───────── header ───────── */}
+              <header className="flex items-center justify-between border-b p-4">
+                <Dialog.Title className="text-lg font-semibold">
+                  {item.name}
+                </Dialog.Title>
+                <button
+                  onClick={onClose}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </header>
 
-          {/* ---------- Panel ---------- */}
-          <div className="fixed inset-0 grid place-items-center p-4">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-200"
-              enterFrom="scale-95 opacity-0"
-              enterTo="scale-100 opacity-100"
-              leave="ease-in duration-150"
-              leaveFrom="scale-100 opacity-100"
-              leaveTo="scale-95 opacity-0"
-            >
-              <Dialog.Panel className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-                {/* ───────── header ───────── */}
-                <header className="flex items-center justify-between border-b p-4">
-                  <Dialog.Title className="text-lg font-semibold">
-                    {item.name}
-                  </Dialog.Title>
-                  <button
-                    onClick={onClose}
-                    className="rounded p-1 text-gray-500 hover:bg-gray-100"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
-                </header>
+              {/* ───────── body ───────── */}
+              <section className="grid gap-6 overflow-y-auto p-6 md:grid-cols-2">
+                {/* imagen */}
+                <div className="flex items-center justify-center">
+                  <LazyImage
+                    src={imgSrc}
+                    alt={item.name}
+                    className="w-full max-h-[60vh] rounded-lg object-contain"
+                  />
+                </div>
 
-                {/* ───────── body ───────── */}
-                <section className="grid gap-6 overflow-y-auto p-6 md:grid-cols-2">
-                  {/* imagen */}
-                  <div className="flex items-center justify-center">
-                    <LazyImage
-                      src={imgSrc}
-                      alt={item.name}
-                      className="w-full max-h-[60vh] rounded-lg object-contain"
-                    />
+                {/* info */}
+                <div className="flex flex-col gap-4">
+                  <p className="text-2xl font-bold text-brand">
+                    {item.price_per_h.toFixed(2)} €/h
+                  </p>
+
+                  {/* rating provisional */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <StarIcon
+                        key={i}
+                        className={clsx(
+                          "h-5 w-5",
+                          i < 4
+                            ? "fill-amber-400 stroke-amber-400"
+                            : "stroke-gray-300"
+                        )}
+                      />
+                    ))}
+                    <span className="ml-1 text-sm text-gray-500">(4,0)</span>
                   </div>
 
-                  {/* info */}
-                  <div className="flex flex-col gap-4">
-                    <p className="text-2xl font-bold text-brand">
-                      {item.price_per_h.toFixed(2)} €/h
+                  {item.description ? (
+                    <p className="prose max-w-none text-sm leading-relaxed">
+                      {item.description}
                     </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Sin descripción.</p>
+                  )}
 
-                    {/* rating provisional */}
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <StarIcon
-                          key={i}
-                          className={clsx(
-                            "h-5 w-5",
-                            i < 4
-                              ? "fill-amber-400 stroke-amber-400"
-                              : "stroke-gray-300"
-                          )}
-                        />
+                  {!!item.categories?.length && (
+                    <div className="flex flex-wrap gap-2">
+                      {item.categories.map(c => (
+                        <span
+                          key={c.id}
+                          className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
+                        >
+                          {c.name}
+                        </span>
                       ))}
-                      <span className="ml-1 text-sm text-gray-500">(4,0)</span>
                     </div>
+                  )}
 
-                    {item.description ? (
-                      <p className="prose max-w-none text-sm leading-relaxed">
-                        {item.description}
-                      </p>
+                  {/* ───────── CTA ───────── */}
+                  <button
+                    onClick={handleReserve}
+                    disabled={reserve.isLoading}
+                    className="btn mt-auto w-full"
+                  >
+                    {reserve.isLoading ? (
+                      <>
+                        <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
+                        Reservando…
+                      </>
                     ) : (
-                      <p className="text-sm text-gray-500">Sin descripción.</p>
+                      "Reservar ahora"
                     )}
-
-                    {!!item.categories?.length && (
-                      <div className="flex flex-wrap gap-2">
-                        {item.categories.map(c => (
-                          <span
-                            key={c.id}
-                            className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
-                          >
-                            {c.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ───────── CTA ───────── */}
-                    <button
-                      onClick={handleReserve}
-                      disabled={loading}
-                      className="btn mt-auto w-full"
-                    >
-                      {loading ? (
-                        <>
-                          <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
-                          Reservando…
-                        </>
-                      ) : (
-                        "Reservar ahora"
-                      )}
-                    </button>
-                  </div>
-                </section>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* ───── modal Stripe para introducir la tarjeta ───── */}
-      <PaymentModal
-        open={Boolean(clientSecret)}
-        clientSecret={clientSecret ?? ""}
-        onClose={() => setClientSecret(null)}
-        onSuccess={() => {
-          toast.success("Reserva confirmada y fianza retenida 🎉");
-          onClose();
-        }}
-      />
-    </>
+                  </button>
+                </div>
+              </section>
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
   );
 }
 
