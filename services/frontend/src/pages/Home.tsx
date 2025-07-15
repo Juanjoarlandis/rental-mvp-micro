@@ -69,7 +69,7 @@ export default function Home() {
         <img
           src={logo}
           alt="Vecino entregando una taladradora a otra persona frente a un garaje"
-          className="absolute inset-0 -z-20 h-full w-full object-cover"
+          className="absolute inset-0 -z-20 h-full w-full object-cover opacity-60"
           loading="eager"
         />
 
