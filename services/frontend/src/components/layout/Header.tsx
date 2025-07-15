@@ -62,12 +62,12 @@ export default function Header() {
   /* enlaces del panel móvil */
   const mobileLinks = token
     ? [
-        { to: '/dashboard', label: 'Perfil' },
-        { label: 'Salir', action: logout },
+        { to: '/dashboard', label: 'Perfil', icon: UserCircleIcon },
+        { label: 'Salir', action: logout, icon: ArrowLeftOnRectangleIcon },
       ]
     : [
-        { to: '/login', label: 'Entrar' },
-        { to: '/register', label: 'Crear cuenta' },
+        { to: '/login', label: 'Entrar', icon: ArrowRightOnRectangleIcon },
+        { to: '/register', label: 'Crear cuenta', icon: UserCircleIcon },
       ];
 
   /* acción primaria escritorio: botón Login o Avatar */
@@ -193,38 +193,32 @@ export default function Header() {
           >
             <Disclosure.Panel className="border-t border-gray-200 bg-white/95 px-4 pb-6 dark:border-gray-700 dark:bg-gray-900/95 md:hidden">
               <nav className="flex flex-col gap-4 pt-6 text-base font-medium">
-                {mobileLinks.map(({ to, label, action }) =>
+                {mobileLinks.map(({ to, label, action, icon: Icon }) =>
                   action ? (
-                    <button
+                    <Disclosure.Button
                       key={label}
+                      as="button"
                       onClick={action}
-                      className="flex items-center gap-2 text-left transition-colors hover:text-brand"
+                      className="flex items-center gap-2 rounded-md p-2 text-left transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
-                      {label === 'Salir' ? (
-                        <ArrowLeftOnRectangleIcon className="h-5 w-5" />
-                      ) : (
-                        <UserCircleIcon className="h-5 w-5" />
-                      )}
+                      <Icon className="h-5 w-5" />
                       {label}
-                    </button>
+                    </Disclosure.Button>
                   ) : (
-                    <NavLink
+                    <Disclosure.Button
                       key={label}
+                      as={NavLink}
                       to={to!}
-                      className={({ isActive }) =>
+                      className={({ isActive }: { isActive: boolean }) =>
                         clsx(
-                          'flex items-center gap-2 transition-colors hover:text-brand',
+                          'flex items-center gap-2 rounded-md p-2 transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                           isActive && 'text-brand',
                         )
                       }
                     >
-                      {label === 'Entrar' ? (
-                        <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                      ) : (
-                        <UserCircleIcon className="h-5 w-5" />
-                      )}
+                      <Icon className="h-5 w-5" />
                       {label}
-                    </NavLink>
+                    </Disclosure.Button>
                   ),
                 )}
               </nav>
