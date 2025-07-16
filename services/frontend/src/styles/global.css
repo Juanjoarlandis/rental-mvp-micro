@@ -6,72 +6,102 @@
 /* ---------- BASE ---------- */
 @layer base {
   html { @apply scroll-smooth; }
-  body { 
+
+  /** Fondo general + noise decorativo */
+  body {
     @apply bg-gray-50 text-gray-800 antialiased font-sans dark:bg-gray-900 dark:text-gray-100;
     background-image: url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+CiAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC45IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+CiAgPC9maWx0ZXI+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI25vaXNlRmlsdGVyKSIgb3BhY2l0eT0iMC4xIi8+ICA8IS0tPC9zdmc+");
     background-repeat: repeat;
-    background-blend-mode: overlay;  /* 🆕 Blend para profundidad sin afectar contenido */
+    background-blend-mode: overlay;
+  }
+
+  /* --- Paleta “surface” auto‑adaptativa ---------------------------- */
+  :root {
+    --surface-light: #ffffff;   /* gris 0  */
+    --surface-dark:  #1f2937;   /* gris 800 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --surface-light: var(--surface-dark); }
   }
 }
 
 /* ---------- COMPONENTS ---------- */
 @layer components {
-  /* Botones - REFACTORED: Añadidas variants (secondary, danger, loading), loading state con spinner, animaciones (hover scale, active bounce), focus ring mejorado, dark mode. */
-  .btn        { 
-    @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; 
-  }  
-  .btn--secondary { 
-    @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; 
-  }
-  .btn--danger { 
-    @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; 
-  }
-  .btn--ghost { 
-    @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; 
-  }
-  .btn--loading { 
-    @apply cursor-wait; /* +spinner en componentes */
-  }
+  /* Botones */
+  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; }
+  .btn--secondary { @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; }
+  .btn--danger { @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; }
+  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; }
 
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
-  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }  /* 🆕 Dark variants */
+  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
   .badge--danger { @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
 
-  /* Campos select genérico */
-  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }  /* 🆕 Dark */
+  /* Select genérico */
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }
 
   /* Toast */
-  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }  /* 🆕 Dark */
+  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }
   .toast-error   { @apply bg-red-600 text-white dark:bg-red-700; }
 
-  /* Títulos fluidos (ejemplo h1) */
-  h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); } /* 36 px → 56 px aprox */
+  /* Títulos fluidos */
+  h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); }
 }
 
 /* ---------- UTILITIES PERSONALIZADAS ---------- */
 @layer utilities {
   .text-balance { text-wrap: balance; }
-
-  /* Evita re-pintados innecesarios en grandes listas */
   .content-auto { content-visibility: auto; }
-
-  /* Oculta scrollbar (usarlo con cuidado) */
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
-  /* Animaciones on-scroll - REFACTORED: Añadida scale para más dinamismo */
+@layer utilities {
+  .img-frame {
+    @apply rounded-lg bg-gray-50 p-2 ring-1 ring-gray-200
+           dark:bg-gray-800 dark:ring-gray-700;
+  }
+}
+
+  /* Animaciones on‑scroll */
   .fade-in { opacity: 0; transform: translateY(20px) scale(0.98); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
   .fade-in.visible { opacity: 1; transform: translateY(0) scale(1); }
 
-  /* Count-up para stats */
+  /* Count‑up para stats */
   .count-up { counter-reset: num var(--num); }
   .count-up::after { content: counter(num); }
   @keyframes count { from { --num: 0; } to { --num: var(--target); } }
 }
 
-/* 🆕 Media query para fine-tune dark mode: noise menos intenso */
+/* 🆕------------------  MODO NOCHE GLOBAL  ------------------ */
+/* Estas reglas se aplican por igual a todos los componentes sin
+   tener que tocarlos uno por uno.  Se basan en utilidades Tailwind,
+   por lo que siguen pudiendo sobre‑escribirse con clases más
+   específicas cuando sea necesario. */
+@layer base {
+  /* Superficies claras → superficie oscura genérica */
+  .dark .bg-white,
+  .dark .bg-gray-50,
+  .dark .bg-gray-100 { @apply bg-gray-800; }
+
+  /* Fondo genérico utilizado en tarjetas (ItemCard, Skeleton…) */
+  .bg-surface       { background-color: var(--surface-light); }
+  .dark .bg-surface { background-color: var(--surface-dark); }
+
+  /* Bordes */
+  .dark .border-gray-200 { @apply border-gray-700; }
+  .dark .border-gray-300 { @apply border-gray-600; }
+
+  /* Texto neutro */
+  .dark .text-gray-500 { @apply text-gray-400; }
+  .dark .text-gray-600 { @apply text-gray-300; }
+  .dark .text-gray-700 { @apply text-gray-200; }
+
+  /* Sombreado de tarjetas más sutil en oscuro */
+  .dark .shadow-card     { box-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .dark .shadow-cardHover{ box-shadow: 0 4px 12px rgba(0,0,0,.8); }
+}
+
+/* Ajuste fino al ruido de fondo en oscuro */
 @media (prefers-color-scheme: dark) {
-  body {
-    background-blend-mode: soft-light;  /* 🆕 Suaviza noise en dark para no "claror" inverso */
-  }
+  body { background-blend-mode: soft-light; }
 }

@@ -19,6 +19,7 @@
                             }
                         ],
                         "files": [
+                            "agree.jpg",
                             "logo.png"
                         ]
                     },
@@ -177,6 +178,7 @@
                                     "LazyImage.tsx",
                                     "ItemCard.tsx",
                                     "SearchBar.tsx",
+                                    "ItemDetailModal.tsx",
                                     "SocialButton.tsx",
                                     "QuickViewModal.tsx"
                                 ]
@@ -201,10 +203,15 @@
                                 "name": "Home",
                                 "dirs": [],
                                 "files": [
+                                    "FlowSteps.tsx",
+                                    "TrustBar.tsx",
                                     "FAQ.tsx",
+                                    "IncentiveBanner.tsx",
                                     "Stats.tsx",
                                     "LogoCloud.tsx",
-                                    "Testimonials.tsx"
+                                    "Testimonials.tsx",
+                                    "Benefits.tsx",
+                                    "CategoryGrid.tsx"
                                 ]
                             },
                             {

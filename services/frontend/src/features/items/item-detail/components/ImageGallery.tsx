@@ -1,83 +1,61 @@
 import { useState } from 'react';
-import { useSwipeable } from 'react-swipeable';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
-import clsx from 'clsx';
 
-export default function ImageGallery({ urls }: { urls: string[] }) {
+type Props = { urls: string[] };
+
+export default function ImageGallery({ urls }: Props) {
   const [idx, setIdx] = useState(0);
-  const total = urls.length;
-
-  const handlers = useSwipeable({
-    onSwipedLeft: () => next(),
-    onSwipedRight: () => prev(),
-    trackMouse: true,
-  });
-
-  function next() {
-    setIdx((i) => (i + 1) % total);
-  }
-  function prev() {
-    setIdx((i) => (i - 1 + total) % total);
-  }
+  const next = () => setIdx((idx + 1) % urls.length);
+  const prev = () => setIdx((idx - 1 + urls.length) % urls.length);
 
   return (
-    <div {...handlers} className="flex flex-col gap-4 bg-gray-50 dark:bg-gray-700">
-      {/* main */}
-        <div className="relative aspect-[4/3] w-full">          {/* NUEVO: ratio 4:3 */}
+    <div className="flex flex-col gap-4">
+      {/* Main image */}
+      <div className="relative">
         <img
-            src={urls[idx]}
-            alt={`Imagen ${idx + 1}`}
-            className="absolute inset-0 h-full w-full
-                    object-contain rounded-xl"             
+          src={urls[idx]}
+          alt={`Imagen ${idx + 1}`}
+          className="
+            img-frame w-full h-80 md:h-[32rem] object-contain
+          "
         />
-
-        {total > 1 && (
+        {urls.length > 1 && (
           <>
-            <NavBtn pos="left" onClick={prev} />
-            <NavBtn pos="right" onClick={next} />
+            <button
+              onClick={prev}
+              aria-label="Imagen anterior"
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full"
+            >
+              <ChevronLeftIcon className="h-6 w-6" />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Imagen siguiente"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full"
+            >
+              <ChevronRightIcon className="h-6 w-6" />
+            </button>
           </>
         )}
       </div>
 
-      {/* thumbs */}
-      {total > 1 && (
-        <div className="flex gap-2 overflow-x-auto px-2 pb-2">
+      {/* Thumbnails */}
+      {urls.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto">
           {urls.map((u, i) => (
-            <button
+            <img
               key={i}
+              src={u}
               onClick={() => setIdx(i)}
-              aria-label={`Miniatura ${i + 1}`}
-              className={clsx(
-                'relative aspect-square h-16 overflow-hidden rounded-lg',
-                i === idx && 'ring-2 ring-brand'
-              )}
-            >
-              <img src={u} alt="" className="h-full w-full object-cover" />
-            </button>
+              className={`
+                img-frame h-16 w-16 object-contain cursor-pointer transition
+                ${i === idx ? 'ring-2 ring-brand scale-105' : 'opacity-70 hover:opacity-100'}
+              `}
+              alt={`Miniatura ${i + 1}`}
+            />
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-function NavBtn({
-  pos,
-  onClick,
-}: {
-  pos: 'left' | 'right';
-  onClick(): void;
-}) {
-  const Icon = pos === 'left' ? ChevronLeftIcon : ChevronRightIcon;
-  return (
-    <button
-      onClick={onClick}
-      className={clsx(
-        'group absolute top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white',
-        pos === 'left' ? 'left-2' : 'right-2'
-      )}
-    >
-      <Icon className="h-6 w-6 group-hover:scale-110 transition-transform" />
-    </button>
   );
 }

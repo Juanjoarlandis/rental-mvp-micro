@@ -615,75 +615,99 @@ export function useStripe() {
 /* ---------- BASE ---------- */
 @layer base {
   html { @apply scroll-smooth; }
-  body { 
+
+  /** Fondo general + noise decorativo */
+  body {
     @apply bg-gray-50 text-gray-800 antialiased font-sans dark:bg-gray-900 dark:text-gray-100;
     background-image: url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+CiAgICA8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC45IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+CiAgPC9maWx0ZXI+CiAgPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI25vaXNlRmlsdGVyKSIgb3BhY2l0eT0iMC4xIi8+ICA8IS0tPC9zdmc+");
     background-repeat: repeat;
-    background-blend-mode: overlay;  /* 🆕 Blend para profundidad sin afectar contenido */
+    background-blend-mode: overlay;
+  }
+
+  /* --- Paleta “surface” auto‑adaptativa ---------------------------- */
+  :root {
+    --surface-light: #ffffff;   /* gris 0  */
+    --surface-dark:  #1f2937;   /* gris 800 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --surface-light: var(--surface-dark); }
   }
 }
 
 /* ---------- COMPONENTS ---------- */
 @layer components {
-  /* Botones - REFACTORED: Añadidas variants (secondary, danger, loading), loading state con spinner, animaciones (hover scale, active bounce), focus ring mejorado, dark mode. */
-  .btn        { 
-    @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; 
-  }  
-  .btn--secondary { 
-    @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; 
-  }
-  .btn--danger { 
-    @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; 
-  }
-  .btn--ghost { 
-    @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; 
-  }
-  .btn--loading { 
-    @apply cursor-wait; /* +spinner en componentes */
-  }
+  /* Botones */
+  .btn        { @apply inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-brand-hover hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 dark:bg-brand-dark dark:hover:bg-brand-hover-dark; }
+  .btn--secondary { @apply inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:bg-gray-300 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600; }
+  .btn--danger { @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 hover:shadow-md hover:scale-105 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-60 active:scale-95 dark:bg-red-700 dark:hover:bg-red-800; }
+  .btn--ghost { @apply inline-flex items-center justify-center rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition-all duration-200 hover:bg-brand/5 hover:shadow-sm hover:scale-105 focus:ring-2 focus:ring-brand focus:ring-offset-2 active:scale-95 dark:border-brand-dark dark:text-brand-dark dark:hover:bg-brand-dark/10; }
 
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
-  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }  /* 🆕 Dark variants */
+  .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
   .badge--danger { @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
 
-  /* Campos select genérico */
-  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }  /* 🆕 Dark */
+  /* Select genérico */
+  .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }
 
   /* Toast */
-  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }  /* 🆕 Dark */
+  .toast-success { @apply bg-green-600 text-white dark:bg-green-700; }
   .toast-error   { @apply bg-red-600 text-white dark:bg-red-700; }
 
-  /* Títulos fluidos (ejemplo h1) */
-  h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); } /* 36 px → 56 px aprox */
+  /* Títulos fluidos */
+  h1 { font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem); }
 }
 
 /* ---------- UTILITIES PERSONALIZADAS ---------- */
 @layer utilities {
   .text-balance { text-wrap: balance; }
-
-  /* Evita re-pintados innecesarios en grandes listas */
   .content-auto { content-visibility: auto; }
-
-  /* Oculta scrollbar (usarlo con cuidado) */
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
-  /* Animaciones on-scroll - REFACTORED: Añadida scale para más dinamismo */
+  /* Animaciones on‑scroll */
   .fade-in { opacity: 0; transform: translateY(20px) scale(0.98); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
   .fade-in.visible { opacity: 1; transform: translateY(0) scale(1); }
 
-  /* Count-up para stats */
+  /* Count‑up para stats */
   .count-up { counter-reset: num var(--num); }
   .count-up::after { content: counter(num); }
   @keyframes count { from { --num: 0; } to { --num: var(--target); } }
 }
 
-/* 🆕 Media query para fine-tune dark mode: noise menos intenso */
-@media (prefers-color-scheme: dark) {
-  body {
-    background-blend-mode: soft-light;  /* 🆕 Suaviza noise en dark para no "claror" inverso */
-  }
+/* 🆕------------------  MODO NOCHE GLOBAL  ------------------ */
+/* Estas reglas se aplican por igual a todos los componentes sin
+   tener que tocarlos uno por uno.  Se basan en utilidades Tailwind,
+   por lo que siguen pudiendo sobre‑escribirse con clases más
+   específicas cuando sea necesario. */
+@layer base {
+  /* Superficies claras → superficie oscura genérica */
+  .dark .bg-white,
+  .dark .bg-gray-50,
+  .dark .bg-gray-100 { @apply bg-gray-800; }
+
+  /* Fondo genérico utilizado en tarjetas (ItemCard, Skeleton…) */
+  .bg-surface       { background-color: var(--surface-light); }
+  .dark .bg-surface { background-color: var(--surface-dark); }
+
+  /* Bordes */
+  .dark .border-gray-200 { @apply border-gray-700; }
+  .dark .border-gray-300 { @apply border-gray-600; }
+
+  /* Texto neutro */
+  .dark .text-gray-500 { @apply text-gray-400; }
+  .dark .text-gray-600 { @apply text-gray-300; }
+  .dark .text-gray-700 { @apply text-gray-200; }
+
+  /* Sombreado de tarjetas más sutil en oscuro */
+  .dark .shadow-card     { box-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .dark .shadow-cardHover{ box-shadow: 0 4px 12px rgba(0,0,0,.8); }
 }
+
+/* Ajuste fino al ruido de fondo en oscuro */
+@media (prefers-color-scheme: dark) {
+  body { background-blend-mode: soft-light; }
+}
+
 
 --- frontend/src/features/auth/forgot.ts ---
 import { api } from "../../api";
@@ -2563,10 +2587,9 @@ export default function Dashboard() {
 
 
 --- frontend/src/pages/Home.tsx ---
-/* Home.tsx – full‑page redesign 2025
-   ✱ Accesibilidad AA, dark‑mode parity, lazy‑loading, perf‑safe animations.
-   ✱ Dependencias: React 18, Tailwind CSS v3, @heroicons/react 24/solid/outline.
-*/
+/* -------------------------------------------------------------- */
+/*  src/pages/Home.tsx – landing 2025                             */
+/* -------------------------------------------------------------- */
 import { Link } from 'react-router-dom';
 import {
   ArrowRightIcon,
@@ -2579,110 +2602,44 @@ import {
   GlobeAltIcon,
 } from '@heroicons/react/24/solid';
 import { useEffect, useRef } from 'react';
-import Container from '../components/shared/Container';
-import Section from '../components/shared/Section';
-import Stats from '../components/Home/Stats';
-import LogoCloud from '../components/Home/LogoCloud';
-import Testimonials from '../components/Home/Testimonials';
-import FAQ from '../components/Home/FAQ';
+import logo from '../assets/agree.jpg';
 
-/* ---------- CONSTANTS ---------- */
-const HERO_COPY = {
-  title: 'Gana dinero con lo que ya tienes',
-  tagline:
-    'Alquila tus herramientas y gadgets en minutos y contribuye a un barrio más sostenible.',
+/* Shared wrappers */
+import Container from '../components/shared/Container';
+import Section   from '../components/shared/Section';
+
+/* Home blocks */
+import TrustBar        from '../components/Home/TrustBar';
+import CategoryGrid    from '../components/Home/CategoryGrid';
+import Benefits        from '../components/Home/Benefits';
+import Stats           from '../components/Home/Stats';
+import FlowSteps       from '../components/Home/FlowSteps';
+import Testimonials    from '../components/Home/Testimonials';
+import IncentiveBanner from '../components/Home/IncentiveBanner';
+import FAQ             from '../components/Home/FAQ';
+import LogoCloud       from '../components/Home/LogoCloud';
+
+/* ----------------------------- HERO COPY ----------------------------- */
+const HERO = {
+  h1     : 'Alquila y gana dinero extra hoy mismo',
+  tagLine: 'Únete a la mayor comunidad local de alquiler de herramientas y gadgets.',
+  bullets: '+3 000 artículos · 24 000 € ahorrados · 0 fraudes',
 };
 
-const BENEFITS = [
-  {
-    icon: ShieldCheckIcon,
-    title: 'Pagos 100 % seguros',
-    desc: 'Stripe Connect y verificación de identidad en cada transacción.',
-  },
-  {
-    icon: UsersIcon,
-    title: 'Comunidad local',
-    desc: 'Conecta con vecinos y reduce la huella de carbono.',
-  },
-  {
-    icon: GlobeAltIcon,
-    title: 'Sin fricción',
-    desc: 'Publica, reserva y gana en tres clics.',
-  },
-];
-
-const STEPS = [
-  {
-    icon: CloudArrowUpIcon,
-    title: 'Publica',
-    desc: 'Sube tu producto, pon precio y reglas de uso.',
-  },
-  {
-    icon: CalendarDaysIcon,
-    title: 'Reserva',
-    desc: 'Los usuarios pagan la fianza y reservan al instante.',
-  },
-  {
-    icon: BanknotesIcon,
-    title: 'Gana',
-    desc: 'Entregas el ítem y recibes el pago asegurado.',
-  },
-];
-
-/* ---------- COMPONENTS ---------- */
-function Benefits() {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => e.isIntersecting && e.target.classList.add('visible')),
-      { threshold: 0.2 }
-    );
-    el.querySelectorAll('.fade-in').forEach((c) => io.observe(c));
-    return () => io.disconnect();
-  }, []);
-
-  return (
-    <Section title="Por qué elegirnos">
-      <Container>
-        <div ref={ref} className="grid gap-8 md:grid-cols-3">
-          {BENEFITS.map(({ icon: Icon, title, desc }) => (
-            <article
-              key={title}
-              className="fade-in space-y-3 rounded-lg bg-white p-6 text-center shadow transition hover:shadow-md dark:bg-gray-800 dark:shadow-gray-700"
-            >
-              <Icon className="mx-auto h-12 w-12 text-brand" />
-              <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
-              <p className="text-gray-600 dark:text-gray-300">{desc}</p>
-            </article>
-          ))}
-        </div>
-      </Container>
-    </Section>
-  );
-}
-
 export default function Home() {
+  /* Animación secuencial para FlowSteps */
   const stepsRef = useRef<HTMLDivElement>(null);
-
-  /* Sequential fade‑in for “Cómo funciona” cards */
   useEffect(() => {
     const el = stepsRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            [...e.target.children].forEach((child, i) => {
-              child.classList.add('visible');
-              (child as HTMLElement).style.transitionDelay = `${i * 0.15}s`;
-            });
-          }
+      ([e]) =>
+        e.isIntersecting &&
+        [...e.target.children].forEach((c, i) => {
+          c.classList.add('visible');
+          (c as HTMLElement).style.transitionDelay = `${i * 0.15}s`;
         }),
-      { threshold: 0.25 }
+      { threshold: 0.3 }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -2690,81 +2647,73 @@ export default function Home() {
 
   return (
     <>
-      {/* ---------- HERO ---------- */}
+      {/* ----------------------------- HERO ----------------------------- */}
       <header
-        className="relative isolate flex min-h-[90vh] items-center justify-center overflow-hidden px-6 text-center text-white dark:text-gray-100"
+        className="
+          relative isolate flex min-h-[90vh] flex-col items-center
+          justify-center overflow-hidden text-center text-white dark:text-gray-100
+        "
       >
-        {/* Background image + gradient overlay */}
-       
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/60 via-black/40 to-black/20 dark:from-gray-900/90" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/60 via-black/40 to-black/10 dark:from-gray-900/80" />
+        <img
+          src={logo}
+          alt="Vecino entregando una taladradora a otra persona frente a un garaje"
+          className="absolute inset-0 -z-20 h-full w-full object-cover opacity-50"
+          loading="eager"
+        />
 
         <Container>
-          <h1 className="mx-auto max-w-4xl text-balance text-5xl font-extrabold leading-tight sm:text-6xl">
-            {HERO_COPY.title}
+          <h1 className="mx-auto max-w-4xl text-balance text-5xl font-extrabold sm:text-6xl">
+            {HERO.h1}
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg/relaxed text-white/90 dark:text-gray-300">
-            {HERO_COPY.tagline}
+          <p className="mx-auto mt-5 max-w-2xl text-lg/relaxed text-white/90 dark:text-gray-300">
+            {HERO.tagLine}
           </p>
+          <p className="mt-3 text-sm uppercase tracking-wider text-brand-light">
+            {HERO.bullets}
+          </p>
+
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link to="/register" className="btn inline-flex gap-2">
-              Empezar ahora <ArrowRightIcon className="h-5 w-5" />
+              Crear cuenta gratis
+              <ArrowRightIcon className="h-5 w-5" />
             </Link>
             <Link to="/dashboard#add" className="btn--ghost inline-flex gap-2">
-              <PlusIcon className="h-5 w-5" /> Publicar un ítem
+              <PlusIcon className="h-5 w-5" />
+              Publicar un ítem
             </Link>
           </div>
         </Container>
+
+        {/* Badge bar */}
+        <TrustBar />
       </header>
 
-      {/* ---------- STATS ---------- */}
-      <Stats />
+      {/* --------------------------- CATEGORÍAS -------------------------- */}
+      <CategoryGrid />
 
-      {/* ---------- LOGO CLOUD ---------- */}
-      <LogoCloud />
-
-      {/* ---------- BENEFITS ---------- */}
+      {/* ---------------------------- BENEFICIOS ------------------------- */}
       <Benefits />
 
-      {/* ---------- CÓMO FUNCIONA ---------- */}
-      <Section title="¿Cómo funciona?" className="bg-gray-100 dark:bg-gray-800">
-        <Container>
-          <div ref={stepsRef} className="grid gap-12 md:grid-cols-3">
-            {STEPS.map(({ icon: Icon, title, desc }) => (
-              <div
-                key={title}
-                className="fade-in space-y-4 rounded-lg bg-white p-6 text-center shadow transition hover:shadow-md dark:bg-gray-700 dark:shadow-gray-800"
-              >
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 dark:bg-brand/20">
-                  <Icon className="h-6 w-6 text-brand" />
-                </div>
-                <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
-                <p className="text-gray-600 dark:text-gray-300">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </Container>
-      </Section>
+      {/* ----------------------------- STATS ---------------------------- */}
+      <Stats />
 
-      {/* ---------- TESTIMONIOS ---------- */}
-      <Testimonials className="bg-white dark:bg-gray-900" />
+      {/* --------------------------- CÓMO FUNCIONA ----------------------- */}
+      <FlowSteps ref={stepsRef} />
 
-      {/* ---------- FAQ ---------- */}
-      <FAQ className="bg-gray-100 dark:bg-gray-800" />
+      {/* ---------------------------- TESTIMONIOS ------------------------ */}
+      <Testimonials />
 
-      {/* ---------- CTA FINAL ---------- */}
-      <section
-        className="relative bg-brand py-16 text-center text-white"
-        style={{ backgroundImage: 'radial-gradient(circle at center, rgba(255,255,255,0.12), transparent)' }}
-      >
-        <Container>
-          <h2 className="mb-6 text-3xl font-bold">
-            ¿Listo para empezar a rentabilizar tus cosas?
-          </h2>
-          <Link to="/register" className="btn inline-flex gap-2">
-            Crear cuenta gratis <ArrowRightIcon className="h-5 w-5" />
-          </Link>
-        </Container>
-      </section>
+      {/* ----------------------- INCENTIVO FOMO ------------------------- */}
+      <IncentiveBanner />
+
+      {/* ------------------------------ FAQ ----------------------------- */}
+      <FAQ />
+
+      {/* ------------------------- CLOUD DE LOGOS ----------------------- */}
+      <LogoCloud />
+
+      {/* ---------- CTA FINAL (dentro de IncentiveBanner) --------------- */}
     </>
   );
 }
@@ -3325,6 +3274,364 @@ export default function SearchBar({ onSubmit }: Props) {
         Limpiar
       </button>
     </form>
+  );
+}
+
+
+--- frontend/src/components/ui/ItemDetailModal.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/ui/ItemDetailModal.tsx                                     */
+/*  – Integra reserva vía micro-servicio **rentals**                          */
+/*    • logos de pago encima del CTA                                          */
+/*    • botón «Reservar ahora» XL que crea el alquiler                        */
+/* -------------------------------------------------------------------------- */
+import { Fragment, useState } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import {
+  XMarkIcon,
+  StarIcon,
+  ShieldCheckIcon,
+  ClockIcon,
+  MapPinIcon,
+  CheckBadgeIcon,
+  UserCircleIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
+import { FaFacebookF, FaTwitter, FaWhatsapp } from "react-icons/fa";
+import { useMutation } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+import clsx from "clsx";
+
+import { Item } from "../../features/items/useItems";
+import { createRental } from "../../features/rentals/createRental";
+import { useAuth } from "../../hooks/useAuth";
+import { resolveImage } from "../../utils";
+import LazyImage from "./LazyImage";
+
+/* ------------------- helpers (Rating, Feature, Description) --------------- */
+
+const Rating = ({ value }: { value: number }) => (
+  <div className="flex items-center gap-1">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <StarIcon
+        key={i}
+        className={clsx(
+          "h-4 w-4",
+          i < value ? "fill-amber-400 stroke-amber-400" : "stroke-gray-300"
+        )}
+      />
+    ))}
+    <span className="ml-1 text-xs text-gray-500">({value.toFixed(1)})</span>
+  </div>
+);
+
+const Feature = ({
+  icon: Icon,
+  text,
+}: {
+  icon: (p: any) => JSX.Element;
+  text: string;
+}) => (
+  <li className="flex items-center gap-2">
+    <Icon className="h-4 w-4 shrink-0 text-brand" />
+    {text}
+  </li>
+);
+
+const Description = ({ text }: { text: string }) => {
+  const bullets = text
+    .split(/(?:\u2022|\n)/) // • o salto de línea
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (bullets.length > 1) {
+    return (
+      <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-gray-700">
+        {bullets.map((b, i) => (
+          <li key={i}>{b}</li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+      {text}
+    </p>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+
+type Props = { open: boolean; onClose: () => void; item: Item | null };
+
+export default function ItemDetailModal({ open, onClose, item }: Props) {
+  if (!item) return null;
+
+  /* ---------- galería ---------- */
+  const gallery =
+    item.image_urls?.length
+      ? item.image_urls
+      : [
+          resolveImage(
+            item.image_url,
+            `https://source.unsplash.com/800x600/?${encodeURIComponent(
+              item.name
+            )}`
+          ),
+        ];
+  const [active, setActive] = useState(0);
+
+  /* ---------- specs demo ---------- */
+  const SPECS: Record<string, string | number> = {
+    Potencia: "600 W",
+    Peso: "1,8 kg",
+    Velocidad: "0-2 800 rpm",
+  };
+
+  /* ---------- reserva rentals ---------- */
+  const { token } = useAuth();
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const now = new Date();
+      const plus1h = new Date(now.getTime() + 60 * 60 * 1000);
+      return createRental(item.id, now.toISOString(), plus1h.toISOString());
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Reserva creada ✔️  Fianza retenida: ${r.deposit.toFixed(2)} €`
+      );
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.detail ??
+        "No se pudo reservar, inténtalo más tarde.";
+      toast.error(msg);
+    },
+  });
+
+  const handleReserve = () => {
+    if (!token) return toast.error("Debes iniciar sesión primero");
+    if (!item.available)
+      return toast.error("Este ítem no está disponible actualmente");
+    mutation.mutate();
+  };
+
+  /* ---------------------------------------------------------------------- */
+  return (
+    <Transition show={open} as={Fragment}>
+      <Dialog onClose={onClose} className="relative z-50">
+        {/* ---- backdrop ---- */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-200"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-150"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+        </Transition.Child>
+
+        {/* ---- wrapper ---- */}
+        <div className="fixed inset-0 grid place-items-center p-4">
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="scale-95 opacity-0"
+            enterTo="scale-100 opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="scale-100 opacity-100"
+            leaveTo="scale-95 opacity-0"
+          >
+            <Dialog.Panel className="flex w-full max-w-6xl max-h-[95vh] flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+              {/* ---------------- Header ---------------- */}
+              <header className="flex items-center justify-between border-b px-6 py-4">
+                <Dialog.Title className="text-lg font-semibold">
+                  {item.name}
+                </Dialog.Title>
+                <button
+                  onClick={onClose}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </header>
+
+              {/* ---------------- Body ---------------- */}
+              <section className="flex flex-1 flex-col gap-8 overflow-y-auto p-6 lg:flex-row">
+                {/* ---------- Galería ---------- */}
+                <div className="lg:w-1/2">
+                  <div className="aspect-video overflow-hidden rounded-lg border">
+                    <LazyImage
+                      src={gallery[active]}
+                      alt={item.name}
+                      className="h-full w-full object-contain"
+                      sizes="(min-width:1024px) 50vw, 90vw"
+                    />
+                  </div>
+
+                  {gallery.length > 1 && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                      {gallery.map((src, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setActive(i)}
+                          className={clsx(
+                            "shrink-0 overflow-hidden rounded-md border",
+                            active === i && "ring-2 ring-brand"
+                          )}
+                        >
+                          <LazyImage
+                            src={src}
+                            alt=""
+                            className="h-16 w-24 object-cover"
+                            sizes="96px"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ---------- Ficha ---------- */}
+                <div className="flex flex-1 flex-col gap-6">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-3xl font-bold text-brand">
+                      {item.price_per_h.toFixed(2)} €/h
+                    </p>
+                    <Rating value={4} />
+                  </div>
+
+                  {item.description ? (
+                    <Description text={item.description} />
+                  ) : (
+                    <p className="text-sm text-gray-500">Sin descripción.</p>
+                  )}
+
+                  <table className="mt-2 w-full max-w-sm text-sm">
+                    <tbody>
+                      {Object.entries(SPECS).map(([k, v]) => (
+                        <tr key={k} className="border-b last:border-0">
+                          <td className="py-1 pr-4 text-gray-600">{k}</td>
+                          <td className="py-1 font-medium">{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {!!item.categories?.length && (
+                    <div className="flex flex-wrap gap-2">
+                      {item.categories.map((c) => (
+                        <span
+                          key={c.id}
+                          className="rounded-full bg-gray-100 px-3 py-0.5 text-xs text-gray-600"
+                        >
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* vendedor (placeholder) */}
+                  <div className="flex items-center gap-3 rounded-md bg-gray-50 p-4">
+                    <UserCircleIcon className="h-10 w-10 text-gray-400" />
+                    <div className="flex-1">
+                      <p className="flex items-center gap-1 text-sm font-semibold">
+                        Juan P.
+                        <CheckBadgeIcon className="h-4 w-4 text-emerald-500" />
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Propietario verificado
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="flex items-center gap-1 text-xs text-gray-500">
+                    <MapPinIcon className="h-4 w-4" />
+                    Recogida en Madrid 28010
+                  </p>
+
+                  <ul className="space-y-1 text-sm">
+                    <Feature
+                      icon={ShieldCheckIcon}
+                      text="Pago seguro con fianza"
+                    />
+                    <Feature
+                      icon={ClockIcon}
+                      text="Cancelación gratis hasta 12 h antes"
+                    />
+                  </ul>
+
+                  {/* redes */}
+                  <div className="mt-3 flex gap-4">
+                    <Social icon={FaFacebookF} label="Facebook" />
+                    <Social icon={FaTwitter} label="Twitter" />
+                    <Social icon={FaWhatsapp} label="WhatsApp" />
+                  </div>
+
+                  {/* --------- LOGOS de pago --------- */}
+                  <div className="mt-6 flex justify-center gap-10 opacity-80">
+                    <img
+                      src="/src/assets/payments/visa.svg"
+                      alt="Visa"
+                      className="h-8 md:h-10 w-auto"
+                    />
+                    <img
+                      src="/src/assets/payments/mastercard.svg"
+                      alt="Mastercard"
+                      className="h-8 md:h-10 w-auto"
+                    />
+                    <img
+                      src="/src/assets/payments/paypal.svg"
+                      alt="PayPal"
+                      className="h-8 md:h-10 w-auto"
+                    />
+                  </div>
+
+                  {/* CTA – XL */}
+                  <button
+                    onClick={handleReserve}
+                    disabled={mutation.isLoading}
+                    className="btn mt-4 w-full lg:max-w-xl py-4 text-lg"
+                  >
+                    {mutation.isLoading ? (
+                      <>
+                        <ArrowPathIcon className="mr-3 h-6 w-6 animate-spin" />
+                        Reservando…
+                      </>
+                    ) : (
+                      "Reservar ahora"
+                    )}
+                  </button>
+                </div>
+              </section>
+            </Dialog.Panel>
+          </Transition.Child>
+        </div>
+      </Dialog>
+    </Transition>
+  );
+}
+
+/* --------------------------- Social button ------------------------------- */
+function Social({
+  icon: Icon,
+  label,
+}: {
+  icon: (p: any) => JSX.Element;
+  label: string;
+}) {
+  return (
+    <a
+      href="#share"
+      aria-label={`Compartir en ${label}`}
+      className="rounded-full bg-gray-100 p-2 text-gray-600 transition-colors hover:bg-gray-200"
+    >
+      <Icon className="h-4 w-4" />
+    </a>
   );
 }
 
@@ -3967,6 +4274,105 @@ export default function Header() {
 }
 
 
+--- frontend/src/components/Home/FlowSteps.tsx ---
+/* -------------------------------------------------------------- */
+/*  FlowSteps – 4 pasos & garantía                                 */
+/* -------------------------------------------------------------- */
+import { forwardRef } from 'react';
+import {
+  CloudArrowUpIcon,
+  CalendarDaysIcon,
+  BanknotesIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/solid';
+import Container from '../shared/Container';
+import Section from '../shared/Section';
+
+const STEPS = [
+  ['Publica',         'Sube tu artículo en 3 min y define reglas.',   CloudArrowUpIcon],
+  ['Reserva',         'Recibe la solicitud y la fianza al instante.', CalendarDaysIcon],
+  ['Gana',            'Entrega el ítem y cobra automáticamente.',     BanknotesIcon],
+  ['Devuelve seguro', 'Verifica estado y libera la fianza.',          ShieldCheckIcon],
+];
+
+export default forwardRef<HTMLDivElement>(function FlowSteps(_, ref) {
+  return (
+    <Section title="¿Cómo funciona?" className="bg-gray-100 dark:bg-gray-800">
+      <Container>
+        <div
+          ref={ref}
+          className="grid gap-12 md:grid-cols-4"
+        >
+          {STEPS.map(([t, d, I]) => {
+            const Icon = I as typeof CloudArrowUpIcon;
+            return (
+              <article
+                key={t as string}
+                className="
+                  fade-in space-y-4 rounded-lg bg-white p-6 text-center
+                  shadow transition hover:shadow-md dark:bg-gray-700 dark:shadow-gray-800
+                "
+              >
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand/10 dark:bg-brand/20">
+                  <Icon className="h-6 w-6 text-brand" />
+                </div>
+                <h3 className="text-lg font-semibold">{t}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{d}</p>
+                {t === 'Devuelve seguro' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Sin costes ocultos · Comisión 8 % solo al cobrar
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </Container>
+    </Section>
+  );
+});
+
+
+--- frontend/src/components/Home/TrustBar.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/Home/TrustBar.tsx                                          */
+/* -------------------------------------------------------------------------- */
+export default function TrustBar() {
+  const BADGES = [
+    ['https://img.shields.io/badge/Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white', 'Stripe'],
+    ['https://img.shields.io/badge/SSL%20256--bit-22C55E?style=for-the-badge&logoColor=white', 'SSL 256‑bit'],
+    ['https://img.shields.io/badge/Seguro%20AXA-0055A4?style=for-the-badge&logo=axa&logoColor=white', 'Seguro AXA'],
+    ['https://img.shields.io/badge/Protecci%C3%B3n-100%25-FFAA00?style=for-the-badge&logoColor=white', 'Protección 100 %'],
+  ] as const;
+
+  return (
+    <ul
+      className="
+        mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4
+        text-center text-[0.7rem] font-medium text-white/90
+        opacity-90 [@media(prefers-reduced-motion:reduce)]:animate-none
+      "
+    >
+      {BADGES.map(([src, label]) => (
+        <li key={label} className="flex flex-col items-center gap-1">
+          {/* Logo */}
+          <img
+            src={src}
+            alt={label}
+            className="h-6 w-auto object-contain"
+            loading="lazy"
+            width={88}
+            height={24}
+          />
+          {/* Texto */}
+          <span className="leading-tight">{label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+
 --- frontend/src/components/Home/FAQ.tsx ---
 /**
  * FAQ – Accessible Accordion (WAI–ARIA Disclosure Pattern)
@@ -4043,6 +4449,36 @@ export default function FAQ({ className = '' }: { className?: string }) {
             </Disclosure>
           ))}
         </div>
+      </Container>
+    </section>
+  );
+}
+
+
+--- frontend/src/components/Home/IncentiveBanner.tsx ---
+/* -------------------------------------------------------------- */
+/*  IncentiveBanner – FOMO                                        */
+/* -------------------------------------------------------------- */
+import { Link } from 'react-router-dom';
+import Container from '../shared/Container';
+import { ArrowRightIcon } from '@heroicons/react/24/solid';
+
+export default function IncentiveBanner() {
+  return (
+    <section
+      className="
+        relative bg-brand py-14 text-center text-white
+        before:absolute before:inset-0 before:-z-10
+        before:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.18),transparent)]
+      "
+    >
+      <Container>
+        <h2 className="mb-3 text-3xl font-bold">5 € de regalo en tu primera reserva</h2>
+        <p className="mb-6 text-sm">Solo para los primeros 100 registros de julio</p>
+        <Link to="/register" className="btn inline-flex gap-2">
+          Aprovechar cupón
+          <ArrowRightIcon className="h-5 w-5" />
+        </Link>
       </Container>
     </section>
   );
@@ -4267,6 +4703,146 @@ export default function Testimonials({ className = '' }: { className?: string })
         </div>
       </Container>
     </section>
+  );
+}
+
+
+--- frontend/src/components/Home/Benefits.tsx ---
+/* -------------------------------------------------------------------------- */
+/*  src/components/Home/Benefits.tsx                                          */
+/* -------------------------------------------------------------------------- */
+/*  • Sección “Por qué elegirnos” con 4 tarjetas animadas                     */
+/*  • Accesibilidad AA, dark‑mode parity, animación fade‑in intersección      */
+/* -------------------------------------------------------------------------- */
+
+import { useEffect, useRef } from 'react';
+import {
+  ShieldCheckIcon,
+  UsersIcon,
+  GlobeAltIcon,
+  LifebuoyIcon,
+} from '@heroicons/react/24/solid';
+
+import Container from '../shared/Container';
+import Section   from '../shared/Section';
+
+/* ---------- Copys & datos (fácilmente traducibles/actualizables) ---------- */
+const BENEFITS = [
+  {
+    icon: ShieldCheckIcon,
+    title: 'Pagos 100 % seguros',
+    desc : 'Stripe Connect y escrow de fianzas protegen cada transacción.',
+  },
+  {
+    icon: UsersIcon,
+    title: 'Comunidad verificada',
+    desc : 'Valoración media 4,8/5 y perfiles autenticados.',
+  },
+  {
+    icon: GlobeAltIcon,
+    title: 'Ahorro sostenible',
+    desc : 'Reduce hasta un 70 % frente a la compra y cuida el planeta.',
+  },
+  {
+    icon: LifebuoyIcon,
+    title: 'Seguro a todo riesgo',
+    desc : 'Cobertura automática de hasta 1 000 € por artículo.',
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/*                             Componente principal                           */
+/* -------------------------------------------------------------------------- */
+export default function Benefits() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  /* Fade‑in cuando la sección entra en viewport --------------------------- */
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => e.isIntersecting && e.target.classList.add('visible')),
+      { threshold: 0.2 }
+    );
+    el.querySelectorAll('.fade-in').forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <Section title="Por qué elegirnos">
+      <Container>
+        <div ref={ref} className="grid gap-8 md:grid-cols-4">
+          {BENEFITS.map(({ icon: Icon, title, desc }) => (
+            <article
+              key={title}
+              className="
+                fade-in space-y-3 rounded-lg bg-white p-6 text-center
+                shadow transition hover:shadow-md dark:bg-gray-800 dark:shadow-gray-700
+              "
+            >
+              <Icon className="mx-auto h-12 w-12 text-brand" />
+              <h3 className="text-xl font-semibold dark:text-gray-100">{title}</h3>
+              <p className="text-gray-600 dark:text-gray-300">{desc}</p>
+            </article>
+          ))}
+        </div>
+      </Container>
+    </Section>
+  );
+}
+
+
+--- frontend/src/components/Home/CategoryGrid.tsx ---
+/* -------------------------------------------------------------- */
+/*  CategoryGrid – primer clic rápido                              */
+/* -------------------------------------------------------------- */
+import { Link } from 'react-router-dom';
+import Container from '../shared/Container';
+import Section from '../shared/Section';
+import {
+  WrenchScrewdriverIcon,
+  CameraIcon,
+  DevicePhoneMobileIcon,
+  AcademicCapIcon,
+  PresentationChartBarIcon,
+  TruckIcon,
+} from '@heroicons/react/24/outline';
+
+const CATS = [
+  { icon: WrenchScrewdriverIcon, name: 'Herramientas' },
+  { icon: TruckIcon,             name: 'Jardín' },
+  { icon: CameraIcon,            name: 'Fotografía' },
+  { icon: AcademicCapIcon,       name: 'Deporte' },
+  { icon: DevicePhoneMobileIcon, name: 'Electrónica' },
+  { icon: PresentationChartBarIcon, name: 'Bebé & movilidad' },
+];
+
+export default function CategoryGrid() {
+  return (
+    <Section title="Explora por categoría" className="bg-white dark:bg-gray-900">
+      <Container>
+        <p className="mx-auto mb-10 max-w-lg text-center text-gray-600 dark:text-gray-400">
+          Busca por categoría y encuentra lo que necesitas en segundos
+        </p>
+        <div className="grid gap-6 sm:grid-cols-3 md:grid-cols-6">
+          {CATS.map(({ icon: Icon, name }) => (
+            <Link
+              key={name}
+              to={`/dashboard?cat=${encodeURIComponent(name)}`}
+              className="
+                group flex flex-col items-center gap-3 rounded-lg bg-gray-50 p-6
+                text-center shadow transition hover:-translate-y-1 hover:bg-gray-100
+                dark:bg-gray-800 dark:hover:bg-gray-700
+              "
+            >
+              <Icon className="h-8 w-8 text-brand transition group-hover:scale-110" />
+              <span className="text-sm font-medium">{name}</span>
+            </Link>
+          ))}
+        </div>
+      </Container>
+    </Section>
   );
 }
 

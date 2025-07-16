@@ -16,7 +16,7 @@ export default function LazyImage({
 }: Props) {
   const [loaded, setLoaded] = useState(false);
 
-  /* genera srcset (320-640-960 px) */
+  /* srcset responsivo 320‑640‑960 px */
   const srcset = [320, 640, 960]
     .map(w => `${src.replace(/(\?.*)?$/, '')}?w=${w} ${w}w`)
     .join(', ');
@@ -27,9 +27,10 @@ export default function LazyImage({
       srcSet={srcset}
       sizes={sizes}
       loading="lazy"
-      decoding="async"                    /* 🆕 */
+      decoding="async"
       onLoad={() => setLoaded(true)}
-      className={`${className} transition-opacity duration-500 ${
+      /* ⬇️  NUEVO: marco neutro + aro para suavizar contraste en dark */
+      className={`img-frame ${className} transition-opacity duration-500 ${
         loaded ? 'opacity-100' : 'opacity-0'
       }`}
       alt={alt}
