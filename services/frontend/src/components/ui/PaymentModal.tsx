@@ -1,20 +1,20 @@
 /* -------------------------------------------------------------------------- */
 /*  src/components/ui/PaymentModal.tsx                                        */
 /* -------------------------------------------------------------------------- */
-import { Fragment, useState } from "react";
-import { Dialog, Transition } from "@headlessui/react";
-import { loadStripe } from "@stripe/stripe-js";
+import { Fragment, useState } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { loadStripe } from '@stripe/stripe-js';
 import {
   Elements,
   PaymentElement,
   useElements,
   useStripe,
-} from "@stripe/react-stripe-js";
-import { ArrowPathIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import toast from "react-hot-toast";
-import { useQueryClient } from "@tanstack/react-query";
+} from '@stripe/react-stripe-js';
+import { ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
-/* ⚠️  usa tu clave pública de Stripe (env var VITE_STRIPE_PK) */
+/* ⚠️  Usa tu clave pública de Stripe (env var VITE_STRIPE_PK) */
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PK!);
 
 type Props = {
@@ -24,15 +24,18 @@ type Props = {
   onSuccess: () => void;
 };
 
-export default function PaymentModal(props: Props) {
-  const { open, clientSecret, onClose, onSuccess } = props;
-
+export default function PaymentModal({
+  open,
+  clientSecret,
+  onClose,
+  onSuccess,
+}: Props) {
   if (!clientSecret) return null;
 
   return (
     <Transition show={open} as={Fragment}>
       <Dialog onClose={onClose} className="relative z-[60]">
-        {/* ---- backdrop ---- */}
+        {/* ---------- backdrop ---------- */}
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-200"
@@ -45,7 +48,7 @@ export default function PaymentModal(props: Props) {
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
         </Transition.Child>
 
-        {/* ---- panel ---- */}
+        {/* ---------- panel ---------- */}
         <div className="fixed inset-0 grid place-items-center p-4">
           <Transition.Child
             as={Fragment}
@@ -71,7 +74,7 @@ export default function PaymentModal(props: Props) {
 
               <Elements
                 stripe={stripePromise}
-                options={{ clientSecret, appearance: { theme: "stripe" } }}
+                options={{ clientSecret, appearance: { theme: 'stripe' } }}
               >
                 <CheckoutForm onCancel={onClose} onSuccess={onSuccess} />
               </Elements>
@@ -83,7 +86,7 @@ export default function PaymentModal(props: Props) {
   );
 }
 
-/* ------------------------ formulario interno ----------------------------- */
+/* ------------------ formulario interno ------------------ */
 function CheckoutForm({
   onCancel,
   onSuccess,
@@ -91,42 +94,39 @@ function CheckoutForm({
   onCancel: () => void;
   onSuccess: () => void;
 }) {
-  const stripe = useStripe();
+  const stripe   = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
-  const qc = useQueryClient();  // ← invalidate cache
+  const qc = useQueryClient(); // ← invalidate cache de alquileres
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!stripe || !elements) return;
 
     setProcessing(true);
     const { error } = await stripe.confirmPayment({
       elements,
-      redirect: "if_required",
+      redirect: 'if_required',
     });
-
     setProcessing(false);
 
     if (error) {
-      toast.error(error.message ?? "No se pudo procesar el pago.");
+      toast.error(error.message ?? 'No se pudo procesar el pago.');
     } else {
-      /* 🔄 refrescar lista de alquileres */
-      qc.invalidateQueries({ queryKey: ["rentals"] });
-      onSuccess(); // ← callback del padre
+      qc.invalidateQueries({ queryKey: ['rentals'] });
+      onSuccess();
     }
-  };
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 p-6">
-      {/* Tarjeta / Wallets / iDEAL, etc. */}
       <PaymentElement />
 
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
           onClick={onCancel}
-          className="btn-secondary px-4 py-2 text-sm"
+          className="btn--secondary px-4 py-2 text-sm"  
         >
           Cancelar
         </button>
@@ -141,7 +141,7 @@ function CheckoutForm({
               Procesando…
             </>
           ) : (
-            "Pagar y confirmar"
+            'Pagar y confirmar'
           )}
         </button>
       </div>

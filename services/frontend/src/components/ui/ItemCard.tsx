@@ -10,12 +10,8 @@ import ItemDetailModal from '../../features/items/item-detail/ItemDetailModal';
 export default function ItemCard({ item }: { item: Item }) {
   const [open, setOpen] = useState(false);
 
-  /* portada (1ª imagen o la legacy) */
-  const cover = item.image_urls?.[0] ?? item.image_url;
-  const imgSrc = resolveImage(
-    cover,
-    `https://source.unsplash.com/640x480/?${encodeURIComponent(item.name)}`
-  );
+  const cover   = item.image_urls?.[0] ?? item.image_url;
+  const imgSrc  = resolveImage(cover, `https://source.unsplash.com/640x480/?${encodeURIComponent(item.name)}`);
 
   return (
     <>
@@ -23,7 +19,7 @@ export default function ItemCard({ item }: { item: Item }) {
         onClick={() => setOpen(true)}
         className="
           flex cursor-pointer flex-col overflow-hidden rounded-lg
-          bg-surface shadow-card transition-transform duration-200
+          bg-surface shadow-card transition-transform transition-shadow duration-200
           hover:-translate-y-1 hover:shadow-cardHover
           dark:bg-surface-dark
         "
@@ -33,7 +29,7 @@ export default function ItemCard({ item }: { item: Item }) {
           <LazyImage
             src={imgSrc}
             alt={item.name}
-            className="aspect-[4/3] w-full object-contain"   /* p‑2 ya lo aporta img-frame */
+            className="aspect-[4/3] w-full object-contain"
           />
 
           {!item.available && (
@@ -104,6 +100,8 @@ function IconBtn({
       className="rounded-full bg-white/90 p-1 text-gray-600 shadow transition-colors hover:bg-white dark:bg-surface dark:text-on-surface-dark"
     >
       {children}
+      {/* ✅ sr‑only para lectores */}
+      <span className="sr-only">{title}</span>
     </button>
   );
 }

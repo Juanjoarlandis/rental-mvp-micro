@@ -176,7 +176,17 @@ export default function Header() {
                 aria-label="Abrir menú"
                 className="rounded-md p-2 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:hover:bg-gray-700 md:hidden"
               >
-                {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+                {open ? (
+                  <>
+                    <XMarkIcon className="h-6 w-6" />
+                    <span className="sr-only">Cerrar menú</span>
+                  </>
+                ) : (
+                  <>
+                    <Bars3Icon className="h-6 w-6" />
+                    <span className="sr-only">Abrir menú</span>
+                  </>
+                )}
               </Disclosure.Button>
             </div>
           </div>

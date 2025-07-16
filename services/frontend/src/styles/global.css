@@ -36,7 +36,9 @@
   /* Badges */
   .badge         { @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium; }
   .badge--ok     { @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
-  .badge--danger { @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
+  .badge--danger { @apply badge bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200; }
+
+  /* …resto sin cambios… */
 
   /* Select genérico */
   .form-select { @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-brand focus:ring-brand transition-all duration-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200; }
